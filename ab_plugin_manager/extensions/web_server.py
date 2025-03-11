@@ -32,15 +32,16 @@ class WebServerPlugin(MagicPlugin):
 
     _logger = getLogger(name)
 
-    def __init__(self) -> None:
+    def __init__(self, app_name: str = "Web-приложение") -> None:
         super().__init__()
 
+        self._app_name = app_name
         self._server: Optional[uvicorn.Server] = None
         self._task: Optional[asyncio.Task] = None
 
     def _create_app(self, pm: PluginManager):
         app = FastAPI(
-            title=self.config.get("app_name"),
+            title=self._app_name,
             version=self.version,
         )
 

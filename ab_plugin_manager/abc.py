@@ -13,7 +13,9 @@
 """
 
 from abc import ABC, abstractmethod
-from typing import Iterable, Collection, Any, NamedTuple, Union
+from contextlib import contextmanager
+from contextvars import ContextVar
+from typing import Iterable, Collection, Any, NamedTuple, Union, Optional
 
 __all__ = ["OperationStep", "Plugin", "DependencyCycleException", "PluginManager"]
 
@@ -102,3 +104,41 @@ class PluginManager(ABC):
         Raises:
             DependencyCycleException - если у шагов операции присутствуют циклические зависимости
         """
+
+    _current: ContextVar['PluginManager'] = ContextVar("PluginManager.current")
+
+    @contextmanager
+    def as_current(self):
+        """
+        Context manager, устанавливающий этот менеджер плагинов в качестве активного для текущего контекста (потока или
+        асинхронной задачи).
+
+        Используется следующим образом:
+
+        >>> pm: PluginManager = ...
+        >>>
+        >>> with pm.as_current():
+        >>>     ...
+        """
+        token = PluginManager._current.set(self)
+        try:
+            yield None
+        finally:
+            PluginManager._current.reset(token)
+
+    @staticmethod
+    def current_maybe() -> Optional['PluginManager']:
+        """
+        Возвращает активный менеджер плагинов или `None` если он не установлен.
+        """
+        return PluginManager._current.get()
+
+    @staticmethod
+    def current() -> 'PluginManager':
+        """
+        Возвращает активный менеджер плагинов, кидает ошибку если он не установлен.
+        """
+        pm = PluginManager._current.get()
+        if pm is None:
+            raise AssertionError("Активный PluginManager не установлен")
+        return pm

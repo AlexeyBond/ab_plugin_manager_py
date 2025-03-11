@@ -1,7 +1,7 @@
 import re
 from abc import ABC
 from types import ModuleType
-from typing import Iterable, Collection, Callable, TypeVar
+from typing import Iterable, Collection, Callable
 
 from ab_plugin_manager.abc import Plugin, OperationStep
 
@@ -12,10 +12,8 @@ _MAGIC_PLUGIN_DEPENDENCIES = '__mp_dependencies'
 _MAGIC_PLUGIN_REVERSE_DEPENDENCIES = '__mp_reverse_dependencies'
 _MAGIC_PLUGIN_STEP_NAME = '__mp_step_name'
 
-T = TypeVar('T')
 
-
-def operation(op_name: str) -> Callable[[T], T]:
+def operation[T](op_name: str) -> Callable[[T], T]:
     """
     Помечает аттрибут магического плагина как шаг, для заданной операции.
 
@@ -31,7 +29,7 @@ def operation(op_name: str) -> Callable[[T], T]:
     return decorator
 
 
-def after(*dependencies) -> Callable[[T], T]:
+def after[T](*dependencies) -> Callable[[T], T]:
     """
     Помечает аттрибут магического плагина как шаг, зависящий от других шагов.
 
@@ -48,7 +46,7 @@ def after(*dependencies) -> Callable[[T], T]:
     return decorator
 
 
-def before(*reverse_dependencies) -> Callable[[T], T]:
+def before[T](*reverse_dependencies) -> Callable[[T], T]:
     """
     Помечает аттрибут магического плагина как шаг, имеющий обратную зависимость от других шагов.
 
@@ -72,7 +70,7 @@ def before(*reverse_dependencies) -> Callable[[T], T]:
     return decorator
 
 
-def step_name(name: str) -> Callable[[T], T]:
+def step_name[T](name: str) -> Callable[[T], T]:
     """
     Явно устанавливает имя шага, созданного из аттрибута магического плагина.
 

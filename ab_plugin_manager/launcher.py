@@ -6,8 +6,9 @@ from logging import getLogger
 from typing import Collection, Optional, Awaitable
 
 from ab_plugin_manager.abc import Plugin
+from ab_plugin_manager.operations import bootstrap, setup_cli_arguments, receive_cli_arguments
 from ab_plugin_manager.plugin_manager import PluginManagerImpl
-from ab_plugin_manager.run_operation import call_all, call_all_parallel_async
+from ab_plugin_manager.run_operation import call_all_parallel_async
 
 __all__ = ["launch_application"]
 
@@ -143,22 +144,18 @@ def launch_application(
             type=int,
         )
 
-        call_all(pm.get_operation_sequence('setup_cli_arguments'), ap)
+        setup_cli_arguments(ap)
 
         if strict:
             args = ap.parse_args()
         else:
             args, _ = ap.parse_known_args()
 
-        call_all(pm.get_operation_sequence('receive_cli_arguments'), args)
+        receive_cli_arguments(args)
 
         nonlocal asyncio_debug, executor_max_workers
         asyncio_debug = args.asyncio_debug
         executor_max_workers = args.executor_max_workers
-
-    parse_args(False)
-    call_all(pm.get_operation_sequence('bootstrap'), pm)
-    parse_args(True)
 
     async def run_async_operations() -> None:
         executor = ThreadPoolExecutor(
@@ -214,4 +211,9 @@ def launch_application(
                 else:
                     _logger.debug("Все задачи выполнены, завершаюсь штатно.")
 
-    asyncio.run(run_async_operations(), debug=asyncio_debug)
+    with pm.as_current():
+        parse_args(False)
+        bootstrap()
+        parse_args(True)
+
+        asyncio.run(run_async_operations(), debug=asyncio_debug)

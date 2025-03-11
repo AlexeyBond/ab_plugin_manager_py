@@ -118,6 +118,21 @@ def call_all_as_wrappers(steps: Iterable[OperationStep], initial: Any, *args, **
     return _call_wrapper(tuple(steps), initial, *args, **kwargs)
 
 
+async def call_all_as_wrappers_async(steps: Iterable[OperationStep], initial: Any, *args, **kwargs) -> Any:
+    # TODO: Add docstring
+    async def _call_wrapper(s: Collection[OperationStep], prev, *a, **kw):
+        if len(s) == 0:
+            return prev
+
+        step, *rest = s
+        callback = partial(_call_wrapper, rest)
+
+        assert asyncio.iscoroutinefunction(step.step)
+        return await step.step(callback, prev, *a, **kw)
+
+    return await _call_wrapper(tuple(steps), initial, *args, **kwargs)
+
+
 async def call_all_parallel_async(steps: Iterable[OperationStep], *args, **kwargs) -> Collection[asyncio.Task]:
     """
     Подготавливает Task'и для параллельного асинхронного запуска шагов в текущем Event Loop'е (и его executor'е).

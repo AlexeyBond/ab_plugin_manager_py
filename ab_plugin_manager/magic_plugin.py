@@ -5,10 +5,10 @@ from typing import Iterable, Collection, Callable, TypeVar
 
 from ab_plugin_manager.abc import Plugin, OperationStep
 
-_SIMPLE_PLUGIN_OP_NAME = '__sp_op_name'
-_SIMPLE_PLUGIN_DEPENDENCIES = '__sp_dependencies'
-_SIMPLE_PLUGIN_REVERSE_DEPENDENCIES = '__sp_reverse_dependencies'
-_SIMPLE_PLUGIN_STEP_NAME = '__sp_step_name'
+_MAGIC_PLUGIN_OP_NAME = '__mp_op_name'
+_MAGIC_PLUGIN_DEPENDENCIES = '__mp_dependencies'
+_MAGIC_PLUGIN_REVERSE_DEPENDENCIES = '__mp_reverse_dependencies'
+_MAGIC_PLUGIN_STEP_NAME = '__mp_step_name'
 
 T = TypeVar('T')
 
@@ -23,7 +23,7 @@ def operation(op_name: str) -> Callable[[T], T]:
     """
 
     def decorator(f):
-        setattr(f, _SIMPLE_PLUGIN_OP_NAME, op_name)
+        setattr(f, _MAGIC_PLUGIN_OP_NAME, op_name)
         return f
 
     return decorator
@@ -39,8 +39,8 @@ def after(*dependencies) -> Callable[[T], T]:
     """
 
     def decorator(f):
-        setattr(f, _SIMPLE_PLUGIN_DEPENDENCIES,
-                (*dependencies, *getattr(f, _SIMPLE_PLUGIN_DEPENDENCIES, ())))
+        setattr(f, _MAGIC_PLUGIN_DEPENDENCIES,
+                (*dependencies, *getattr(f, _MAGIC_PLUGIN_DEPENDENCIES, ())))
         return f
 
     return decorator
@@ -63,8 +63,8 @@ def before(*reverse_dependencies) -> Callable[[T], T]:
     """
 
     def decorator(f):
-        setattr(f, _SIMPLE_PLUGIN_REVERSE_DEPENDENCIES,
-                (*reverse_dependencies, *getattr(f, _SIMPLE_PLUGIN_REVERSE_DEPENDENCIES, ())))
+        setattr(f, _MAGIC_PLUGIN_REVERSE_DEPENDENCIES,
+                (*reverse_dependencies, *getattr(f, _MAGIC_PLUGIN_REVERSE_DEPENDENCIES, ())))
         return f
 
     return decorator
@@ -80,7 +80,7 @@ def step_name(name: str) -> Callable[[T], T]:
     """
 
     def decorator(f):
-        setattr(f, _SIMPLE_PLUGIN_STEP_NAME, name)
+        setattr(f, _MAGIC_PLUGIN_STEP_NAME, name)
         return f
 
     return decorator
@@ -103,13 +103,13 @@ def extract_operations_from(
 
         value = getattr(obj, attr)
 
-        op_name: str = getattr(value, _SIMPLE_PLUGIN_OP_NAME, attr)
-        name: str = getattr(value, _SIMPLE_PLUGIN_STEP_NAME,
+        op_name: str = getattr(value, _MAGIC_PLUGIN_OP_NAME, attr)
+        name: str = getattr(value, _MAGIC_PLUGIN_STEP_NAME,
                             None) or f'{plugin.name}.{attr}'
         dependencies: Collection[str] = getattr(
-            value, _SIMPLE_PLUGIN_DEPENDENCIES, ())
+            value, _MAGIC_PLUGIN_DEPENDENCIES, ())
         reverse_dependencies: Collection[str] = getattr(
-            value, _SIMPLE_PLUGIN_REVERSE_DEPENDENCIES, ())
+            value, _MAGIC_PLUGIN_REVERSE_DEPENDENCIES, ())
 
         steps[op_name] = (
             OperationStep(

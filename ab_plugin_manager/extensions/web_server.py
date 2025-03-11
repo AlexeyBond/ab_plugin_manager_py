@@ -9,6 +9,8 @@ from ab_plugin_manager.abc import PluginManager
 from ab_plugin_manager.magic_plugin import MagicPlugin, step_name
 from ab_plugin_manager.run_operation import call_all
 
+__all__ = ["WebServerPlugin"]
+
 
 class WebServerPlugin(MagicPlugin):
     name = 'web_server'

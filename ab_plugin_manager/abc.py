@@ -15,6 +15,8 @@
 from abc import ABC, abstractmethod
 from typing import Iterable, Collection, Any, NamedTuple, Union
 
+__all__ = ["OperationStep", "Plugin", "DependencyCycleException", "PluginManager"]
+
 
 class OperationStep(NamedTuple):
     """

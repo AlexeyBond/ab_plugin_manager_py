@@ -12,6 +12,8 @@ from ab_plugin_manager.file_patterns import match_files, substitute_patterns
 from ab_plugin_manager.magic_plugin import MagicPlugin, after, step_name, operation, MagicModulePlugin
 from ab_plugin_manager.run_operation import call_until_first_result, call_all
 
+__all__ = ["PluginDiscoveryPlugin"]
+
 
 class PluginDiscoveryPlugin(MagicPlugin):
     name = 'discover_plugins'

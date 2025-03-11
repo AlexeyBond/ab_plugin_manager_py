@@ -5,6 +5,8 @@ from typing import Any
 
 from ab_plugin_manager.magic_plugin import MagicPlugin, after
 
+__all__ = ["LoggingPlugin"]
+
 _DEFAULT_LOG_LEVEL = environ.get('LOG_LEVEL', 'INFO').upper()
 
 

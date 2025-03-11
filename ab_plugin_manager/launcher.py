@@ -9,6 +9,8 @@ from ab_plugin_manager.abc import Plugin
 from ab_plugin_manager.plugin_manager import PluginManagerImpl
 from ab_plugin_manager.run_operation import call_all, call_all_parallel_async
 
+__all__ = ["launch_application"]
+
 _logger = getLogger('launcher')
 
 _HANDLED_SIGNALS = (

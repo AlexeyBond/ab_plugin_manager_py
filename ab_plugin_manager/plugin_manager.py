@@ -4,6 +4,8 @@ from typing import Iterable, Collection
 
 from ab_plugin_manager.abc import PluginManager, OperationStep, Plugin, DependencyCycleException
 
+__all__ = ["PluginManagerImpl"]
+
 
 class PluginManagerImpl(PluginManager):
     __slots__ = ('_plugins', '_logger')

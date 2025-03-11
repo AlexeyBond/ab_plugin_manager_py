@@ -5,6 +5,8 @@ from typing import Iterable, Collection, Callable, TypeVar
 
 from ab_plugin_manager.abc import Plugin, OperationStep
 
+__all__ = ["operation", "after", "before", "step_name", "MagicPlugin", "MagicModulePlugin"]
+
 _MAGIC_PLUGIN_OP_NAME = '__mp_op_name'
 _MAGIC_PLUGIN_DEPENDENCIES = '__mp_dependencies'
 _MAGIC_PLUGIN_REVERSE_DEPENDENCIES = '__mp_reverse_dependencies'

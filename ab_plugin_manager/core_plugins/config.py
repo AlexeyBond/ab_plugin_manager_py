@@ -20,6 +20,8 @@ try:
 except ImportError:
     from yaml import Loader, Dumper
 
+__all__ = ["ConfigPlugin"]
+
 from ab_plugin_manager.magic_plugin import MagicPlugin, step_name
 from ab_plugin_manager.abc import PluginManager, OperationStep, Plugin
 

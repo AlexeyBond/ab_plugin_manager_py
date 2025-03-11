@@ -5,6 +5,9 @@ from pathlib import Path
 from random import choice
 from typing import Optional, Union, Iterable
 
+__all__ = ["PathVariableValue", "register_variable", "match_files", "pick_random_file", "substitute_pattern",
+           "substitute_patterns", "first_substitution"]
+
 PathVariableValue = Union[str, Iterable[str]]
 
 _global_variables: dict[str, PathVariableValue] = dict(

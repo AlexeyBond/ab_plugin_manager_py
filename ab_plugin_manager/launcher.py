@@ -206,7 +206,10 @@ def launch_application(
                     [task.get_name() for task in run_tasks if not task.done()]
                 )
 
-                if await _run_with_interrupts(asyncio.wait(run_tasks)):
+                # TODO: Нужно проверить, корректно ли отрабатывает следующий блок...
+                try:
+                    await _run_with_interrupts(asyncio.gather(*run_tasks, return_exceptions=True))
+                except InterruptedError:
                     _logger.info("Получен ещё один сигнал прерывания. Пытаюсь завершиться быстрее.")
                 else:
                     _logger.debug("Все задачи выполнены, завершаюсь штатно.")

@@ -1,15 +1,21 @@
 import asyncio
 from logging import getLogger
-from typing import Optional
+from typing import Optional, Callable
 
 import uvicorn  # type: ignore
 from fastapi import FastAPI, APIRouter
 
-from ab_plugin_manager.abc import PluginManager
+from ab_plugin_manager.magic_operation import CallAllOperation, MagicOperation
 from ab_plugin_manager.magic_plugin import MagicPlugin, step_name
-from ab_plugin_manager.run_operation import call_all
 
-__all__ = ["WebServerPlugin"]
+__all__ = [
+    "WebServerPlugin",
+    "register_fastapi_endpoints_op",
+    "register_fastapi_routes_op",
+]
+
+register_fastapi_routes_op = CallAllOperation[FastAPI]("register_fastapi_routes")
+register_fastapi_endpoints_op = MagicOperation[Callable[[APIRouter], None]]("register_fastapi_endpoints")
 
 
 class WebServerPlugin(MagicPlugin):
@@ -32,31 +38,31 @@ class WebServerPlugin(MagicPlugin):
 
     _logger = getLogger(name)
 
-    def __init__(self, app_name: str = "Web-приложение") -> None:
+    def __init__(self) -> None:
         super().__init__()
 
-        self._app_name = app_name
         self._server: Optional[uvicorn.Server] = None
         self._task: Optional[asyncio.Task] = None
 
-    def _create_app(self, pm: PluginManager):
+    def _create_app(self):
         app = FastAPI(
-            title=self._app_name,
+            title=self.config.get("app_name"),
             version=self.version,
         )
 
-        call_all(pm.get_operation_sequence('register_fastapi_routes'), app, pm)
+        register_fastapi_routes_op(app)
 
         return app
 
     @step_name('register_plugin_api_endpoints')
-    def register_fastapi_routes(self, app: FastAPI, pm: PluginManager, *_args, **_kwargs):
+    @register_fastapi_routes_op.implementation
+    def register_fastapi_routes(self, app: FastAPI, *_args, **_kwargs):
         api_root_router = APIRouter()
 
-        for step in pm.get_operation_sequence('register_fastapi_endpoints'):
+        for step in register_fastapi_endpoints_op.get_steps():
             router = APIRouter()
 
-            step.step(router, pm)
+            step.step(router)
 
             api_root_router.include_router(
                 router, prefix=f'/{step.plugin.name}')
@@ -67,14 +73,14 @@ class WebServerPlugin(MagicPlugin):
         await self._server.serve()
         self._logger.debug("Сервер завершил работу.")
 
-    async def run(self, pm: PluginManager, *_args, **_kwargs):
+    async def run(self, *_args, **_kwargs):
         if 'reload' in self.config or 'workers' in self.config:
             self._logger.warning(
                 f"Конфигурация содержит параметры reload и/или workers. Они будут проигнорированы."
             )
 
         uvicorn_config = uvicorn.Config(
-            self._create_app(pm),
+            self._create_app(),
             **self.config
         )
 

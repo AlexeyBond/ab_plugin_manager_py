@@ -420,11 +420,11 @@ class ConfigPlugin(MagicPlugin):
         )
 
     @step_name('config')
-    def bootstrap(self, pm: PluginManager, *_args, **_kwargs):
-        for step in pm.get_operation_sequence('config'):
+    def bootstrap(self, *_args, **_kwargs):
+        for step in PluginManager.current().get_operation_sequence('config'):
             self._init_config_scope(step)
 
-    def plugin_discovered(self, _pm: PluginManager, plugin: Plugin, *_args, **_kwargs):
+    def plugin_discovered(self, plugin: Plugin, *_args, **_kwargs):
         for step in plugin.get_operation_steps('config'):
             self._init_config_scope(step)
 

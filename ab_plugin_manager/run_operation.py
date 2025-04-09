@@ -8,7 +8,13 @@ from typing import Any, Collection, Iterable
 
 from ab_plugin_manager.abc import OperationStep
 
-__all__ = ["call_all", "call_all_as_wrappers", "call_all_parallel_async", "call_until_first_result"]
+__all__ = [
+    "call_all",
+    "call_all_as_wrappers",
+    "call_all_as_wrappers_async",
+    "call_all_parallel_async",
+    "call_until_first_result",
+]
 
 
 def call_all(steps: Iterable[OperationStep], *args, **kwargs):
@@ -177,8 +183,7 @@ async def call_all_parallel_async(steps: Iterable[OperationStep], *args, **kwarg
             if asyncio.iscoroutinefunction(step.step):
                 await step.step(*args, **kwargs)
             else:
-                await loop.run_in_executor(
-                    None,
+                await asyncio.to_thread(
                     partial(step.step, *args, **kwargs),
                 )
         except asyncio.CancelledError:

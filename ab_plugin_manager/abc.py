@@ -84,6 +84,11 @@ class DependencyCycleException(Exception):
                f'{", ".join(map(str, self.steps))}'
 
 
+class CurrentPluginManagerNotSetException(Exception):
+    def __init__(self):
+        super().__init__("Активный PluginManager не установлен")
+
+
 class PluginManager(ABC):
     """
     Менеджер плагинов. Предоставляет доступ ко всем загруженным на данный момент плагинам.
@@ -131,14 +136,20 @@ class PluginManager(ABC):
         """
         Возвращает активный менеджер плагинов или `None` если он не установлен.
         """
-        return PluginManager._current.get()
+        try:
+            return PluginManager._current.get()
+        except LookupError:
+            return None
 
     @staticmethod
     def current() -> 'PluginManager':
         """
         Возвращает активный менеджер плагинов, кидает ошибку если он не установлен.
+
+        :raises CurrentPluginManagerNotSetException
         """
-        pm = PluginManager._current.get()
-        if pm is None:
-            raise AssertionError("Активный PluginManager не установлен")
+        try:
+            pm = PluginManager._current.get()
+        except LookupError:
+            raise CurrentPluginManagerNotSetException()
         return pm

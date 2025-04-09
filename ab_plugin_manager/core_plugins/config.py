@@ -450,8 +450,6 @@ class ConfigPlugin(MagicPlugin):
                     _logger.exception("Ошибка при обработке изменений в конфигурации %s", scope_name)
 
     async def run(self, *_args, **_kwargs):
-        loop = asyncio.get_running_loop()
-
         while True:
             await asyncio.sleep(self.config['watchIntervalSeconds'])
 
@@ -461,8 +459,7 @@ class ConfigPlugin(MagicPlugin):
             if (not watch_file_changes) and (not watch_memory_changes):
                 continue
 
-            await loop.run_in_executor(
-                None,
+            await asyncio.to_thread(
                 self._scan_changes,
                 watch_file_changes, watch_memory_changes
             )

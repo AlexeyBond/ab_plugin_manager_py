@@ -1,8 +1,11 @@
+import asyncio
 import unittest
 from logging import Logger
+from unittest.async_case import IsolatedAsyncioTestCase
 from unittest.mock import Mock
 
-from ab_plugin_manager.abc import OperationStep, DependencyCycleException
+from ab_plugin_manager.abc import OperationStep, DependencyCycleException, PluginManager, \
+    CurrentPluginManagerNotSetException
 from ab_plugin_manager.magic_plugin import MagicPlugin, after, step_name, before
 from ab_plugin_manager.plugin_manager import PluginManagerImpl
 
@@ -91,6 +94,75 @@ class PluginManagerTest(unittest.TestCase):
                               plugins[1], ('_TestPlugin1.init',), ()),
             ]
         )
+
+    def test_current(self):
+        pm, pm2 = PluginManagerImpl([]), PluginManagerImpl([])
+        self.assertIs(PluginManager.current_maybe(), None)
+        with self.assertRaises(CurrentPluginManagerNotSetException):
+            PluginManager.current()
+        with pm.as_current():
+            self.assertIs(PluginManager.current_maybe(), pm)
+            self.assertIs(PluginManager.current(), pm)
+
+            with pm2.as_current():
+                self.assertIs(PluginManager.current_maybe(), pm2)
+                self.assertIs(PluginManager.current(), pm2)
+
+            self.assertIs(PluginManager.current_maybe(), pm)
+            self.assertIs(PluginManager.current(), pm)
+        self.assertIs(PluginManager.current_maybe(), None)
+        with self.assertRaises(CurrentPluginManagerNotSetException):
+            PluginManager.current()
+
+
+class PluginManagerTestAsync(IsolatedAsyncioTestCase):
+    async def test_current_async(self):
+        b = asyncio.Barrier(2)
+        pm, pm1, pm2 = PluginManagerImpl([]), PluginManagerImpl([]), PluginManagerImpl([])
+
+        async def task1():
+            self.assertIs(PluginManager.current(), pm)
+            with pm1.as_current():
+                self.assertIs(PluginManager.current(), pm1)
+                await b.wait()
+                self.assertIs(PluginManager.current(), pm1)
+                await b.wait()
+                self.assertIs(PluginManager.current(), pm1)
+            self.assertIs(PluginManager.current(), pm)
+
+        async def task2():
+            self.assertIs(PluginManager.current(), pm)
+            with pm2.as_current():
+                self.assertIs(PluginManager.current(), pm2)
+                await b.wait()
+                self.assertIs(PluginManager.current(), pm2)
+                await b.wait()
+                self.assertIs(PluginManager.current(), pm2)
+            self.assertIs(PluginManager.current(), pm)
+
+        with pm.as_current():
+            await asyncio.gather(task1(), task2())
+
+    async def test_current_async_to_sync(self):
+        pm, pm1, pm2 = PluginManagerImpl([]), PluginManagerImpl([]), PluginManagerImpl([])
+
+        def sync_task():
+            self.assertIs(PluginManager.current(), pm1)
+            with pm2.as_current():
+                self.assertIs(PluginManager.current(), pm2)
+            self.assertIs(PluginManager.current(), pm1)
+
+        async def async_task():
+            self.assertIs(PluginManager.current(), pm)
+            with pm1.as_current():
+                self.assertIs(PluginManager.current(), pm1)
+                await asyncio.to_thread(sync_task)
+                self.assertIs(PluginManager.current(), pm1)
+            self.assertIs(PluginManager.current(), pm)
+
+        with pm.as_current():
+            await async_task()
+            self.assertIs(PluginManager.current(), pm)
 
 
 if __name__ == '__main__':

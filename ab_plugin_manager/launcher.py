@@ -166,7 +166,7 @@ def launch_application(
         run_tasks: Optional[Collection[asyncio.Task]] = None
 
         try:
-            init_tasks = await call_all_parallel_async(pm.get_operation_sequence('init'), pm)
+            init_tasks = await call_all_parallel_async(pm.get_operation_sequence('init'))
 
             try:
                 await _run_with_interrupts(asyncio.gather(*init_tasks))
@@ -176,7 +176,7 @@ def launch_application(
 
             _logger.info("Инициализация завершена.")
 
-            run_tasks = await call_all_parallel_async(pm.get_operation_sequence('run'), pm)
+            run_tasks = await call_all_parallel_async(pm.get_operation_sequence('run'))
             try:
                 await _run_with_interrupts(asyncio.gather(*run_tasks))
             except InterruptedError:
@@ -188,7 +188,7 @@ def launch_application(
         finally:
             _logger.debug("Начинаю выполнение операции terminate...")
 
-            terminate_tasks = await call_all_parallel_async(pm.get_operation_sequence('terminate'), pm)
+            terminate_tasks = await call_all_parallel_async(pm.get_operation_sequence('terminate'))
             try:
                 await _run_with_interrupts(asyncio.gather(*terminate_tasks))
             except InterruptedError:

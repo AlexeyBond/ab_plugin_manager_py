@@ -144,7 +144,7 @@ class PluginDiscoveryPlugin(MagicPlugin):
 
         pm = PluginManager.current()
 
-        return call_until_first_result(pm.get_operation_sequence('discover_plugins_in_module'), pm, module)
+        return call_until_first_result(pm.get_operation_sequence('discover_plugins_in_module'), module)
 
     @step_name('discover_explicit_plugins')
     def discover_plugins_in_module(self, module: ModuleType, *_args, **_kwargs):

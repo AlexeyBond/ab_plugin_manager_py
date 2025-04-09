@@ -45,7 +45,7 @@ class LoggingPlugin(MagicPlugin):
             basicConfig(level=args.log_level, force=True)
 
     @after('config')
-    def bootstrap(self, _pm, *_args, **_kwargs):
+    def bootstrap(self, *_args, **_kwargs):
         basicConfig(
             **{**self.config.get('basicConfig', {}), **{'force': True}})
 

@@ -47,7 +47,7 @@ async def _wait_for_interrupt() -> None:
             done, _ = await asyncio.wait([future], timeout=timeout)
 
             if len(done) > 0:
-                return await done[0]
+                return await done.pop()
 
             # Если кто-то ещё и установит свой обработчик, то, скорее всего ближе к началу работы программы.
             # Так что делаем повторные попытки реже со временем, что бы не слишком грузить процессор.

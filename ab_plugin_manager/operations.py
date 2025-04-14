@@ -2,10 +2,11 @@
 Операции, запускаемые лаунчером и плагинами ядра, включёнными в этот пакет.
 """
 from argparse import ArgumentParser, Namespace
+from typing import Tuple
 
 from ab_plugin_manager.magic_operation import CallAllOperation, CallAllAsyncConcurrentOperation
 
-bootstrap = CallAllOperation("bootstrap")
+bootstrap = CallAllOperation[*Tuple[()]]("bootstrap")
 """
 Операция, которая выполняется при запуске приложения.
 Доступна только в плагинах ядра.

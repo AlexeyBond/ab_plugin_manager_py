@@ -163,7 +163,8 @@ def substitute_patterns(
         ValueError если один из шаблон ов использует переменную, значение которой не определено
     """
     if isinstance(patterns, str):
-        return substitute_pattern(patterns, override_vars=override_vars)
+        yield from substitute_pattern(patterns, override_vars=override_vars)
+        return
 
     for pattern in patterns:
         yield from substitute_pattern(pattern, override_vars=override_vars)

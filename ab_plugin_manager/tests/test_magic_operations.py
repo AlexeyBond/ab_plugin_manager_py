@@ -2,8 +2,8 @@ import unittest
 
 from ab_plugin_manager.magic_operation import AsyncWrapperCallOperation
 from ab_plugin_manager.magic_plugin import step_name, after
-from build.lib.ab_plugin_manager.magic_plugin import MagicPlugin
-from build.lib.ab_plugin_manager.plugin_manager import PluginManagerImpl
+from ab_plugin_manager.magic_plugin import MagicPlugin
+from ab_plugin_manager.plugin_manager import PluginManagerImpl
 
 
 class MagicOperationsTest(unittest.IsolatedAsyncioTestCase):

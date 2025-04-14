@@ -189,8 +189,8 @@ class PluginDiscoveryPlugin(MagicPlugin):
         return MagicModulePlugin(module),
 
     def register_fastapi_endpoints(self, router, *_args, **_kwargs) -> None:
-        from fastapi import APIRouter
-        from pydantic import BaseModel, Field
+        from fastapi import APIRouter # type : ignore
+        from pydantic import BaseModel, Field # type : ignore
 
         r: APIRouter = router
 

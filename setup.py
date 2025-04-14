@@ -2,7 +2,7 @@ from setuptools import setup, find_packages
 
 setup(
     name="ab_plugin_manager",
-    version="0.1.8",
+    version="0.1.9",
 
     author="Alexey Bondarenko",
     author_email="alexey.bond.94.55@gmail.com",

@@ -470,8 +470,8 @@ class ConfigPlugin(MagicPlugin):
                 self._store_config(scope_name)
 
     def register_fastapi_endpoints(self, router, *_args, **_kwargs) -> None:
-        from fastapi import APIRouter, Body, HTTPException
-        from pydantic import BaseModel, Field
+        from fastapi import APIRouter, Body, HTTPException  # type : ignore
+        from pydantic import BaseModel, Field  # type : ignore
 
         r: APIRouter = router
 

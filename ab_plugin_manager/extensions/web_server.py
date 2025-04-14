@@ -3,7 +3,7 @@ from logging import getLogger
 from typing import Optional, Callable
 
 import uvicorn  # type: ignore
-from fastapi import FastAPI, APIRouter
+from fastapi import FastAPI, APIRouter  # type: ignore
 
 from ab_plugin_manager.magic_operation import CallAllOperation, MagicOperation
 from ab_plugin_manager.magic_plugin import MagicPlugin, step_name

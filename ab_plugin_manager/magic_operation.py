@@ -1,7 +1,7 @@
 import asyncio
 from asyncio import Task
 from functools import wraps, partial
-from typing import Callable, Iterable, Union, Awaitable, Collection
+from typing import Callable, Iterable, Union, Awaitable, Collection, Optional
 
 from ab_plugin_manager.abc import PluginManager, OperationStep
 from ab_plugin_manager.magic_plugin import operation as operation_decorator
@@ -12,7 +12,8 @@ from ab_plugin_manager.run_operation import call_all_as_wrappers, call_all, call
 def _is_method(fn) -> bool:
     import inspect
     # TODO: Find a more accurate way to detect a method...
-    return inspect.getargs(fn.__code__).args[0] == "self"
+    args = inspect.getargs(fn.__code__).args
+    return len(args) > 0 and args[0] == "self"
 
 
 class MagicOperation[TImpl: Callable]:
@@ -41,12 +42,12 @@ class MagicOperation[TImpl: Callable]:
 
 
 class CallAllOperation[*TARgs](MagicOperation[Callable[[*TARgs], None]]):
-    def __call__(self, *args: TARgs, **kwargs) -> None:
+    def __call__(self, *args: *TARgs, **kwargs) -> None:
         call_all(self.get_steps(), *args, **kwargs)
 
 
 class WrapperCallOperation[*TARgs, TResult](
-    MagicOperation[Callable[[Callable[[TResult, *TARgs], TResult], *TARgs], TResult]]
+    MagicOperation[Callable[[Callable[[TResult, *TARgs], TResult], Optional[TResult], *TARgs], TResult]]
 ):
     """
 
@@ -77,10 +78,10 @@ class WrapperCallOperation[*TARgs, TResult](
     >>> op(*args, **kwargs)
     """
 
-    def invoke(self, *args: TARgs, **kwargs) -> TResult:
+    def invoke(self, *args: *TARgs, **kwargs) -> TResult:
         return call_all_as_wrappers(self.get_steps(), None, *args, **kwargs)
 
-    async def ainvoke(self, *args: TARgs, **kwargs) -> TResult:
+    async def ainvoke(self, *args: *TARgs, **kwargs) -> TResult:
         return await asyncio.to_thread(partial(self.invoke, *args, **kwargs))
 
     __call__ = invoke
@@ -99,7 +100,10 @@ class WrapperCallOperation[*TARgs, TResult](
 
 
 class AsyncWrapperCallOperation[*TARgs, TResult](
-    MagicOperation[Callable[[Callable[[TResult, *TARgs], Awaitable[TResult]], *TARgs], Awaitable[TResult]]]
+    MagicOperation[Callable[
+        [Callable[[Optional[TResult], *TARgs], Awaitable[TResult]], *TARgs],
+        Awaitable[Optional[TResult]]
+    ]]
 ):
     """
 
@@ -137,11 +141,14 @@ class AsyncWrapperCallOperation[*TARgs, TResult](
     def factory_implementation(self, fn: Callable[[*TARgs], Awaitable[TResult]]):
         if _is_method(fn):
             @wraps(fn)
-            async def impl(self, nxt, prev, *args, **kwargs):
-                return await nxt(prev if prev is not None else await fn(self, *args, **kwargs), *args, **kwargs)
+            async def impl(self, nxt, prev, *args: *TARgs, **kwargs):
+                return await nxt(
+                    prev if prev is not None else await fn(self, *args, **kwargs),
+                    *args, **kwargs
+                )
         else:
             @wraps(fn)
-            async def impl(nxt, prev, *args, **kwargs):
+            async def impl(nxt, prev, *args: *TARgs, **kwargs):
                 return await nxt(prev if prev is not None else await fn(*args, **kwargs), *args, **kwargs)
 
         return self.implementation(impl)
@@ -150,5 +157,5 @@ class AsyncWrapperCallOperation[*TARgs, TResult](
 class CallAllAsyncConcurrentOperation[*TArgs, TResult](
     MagicOperation[Union[Callable[[*TArgs], TResult], Callable[[*TArgs], Awaitable[TResult]]]]
 ):
-    async def __call__(self, *args: TArgs, **kwargs) -> Collection[Task[TResult]]:
+    async def __call__(self, *args: *TArgs, **kwargs) -> Collection[Task[TResult]]:
         return await call_all_parallel_async(self.get_steps(), *args, **kwargs)

@@ -70,7 +70,7 @@ class PluginDiscoveryPlugin(MagicPlugin):
         yield from super().get_operation_steps(op_name)
 
     @after('config')
-    def bootstrap(self, *_args, **_kwargs):
+    def bootstrap(self, *_args, **_kwargs) -> None:
         sys.path.extend(substitute_patterns(self.config['appendPythonPath']))
 
         # TODO: Use operations API

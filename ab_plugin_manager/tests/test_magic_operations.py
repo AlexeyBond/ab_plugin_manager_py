@@ -1,6 +1,8 @@
 import unittest
+from typing import Any
 
-from ab_plugin_manager.magic_operation import AsyncWrapperCallOperation
+from ab_plugin_manager.magic_operation import AsyncWrapperCallOperation, WrapperCallOperation, \
+    MagicOperationResultCheckError
 from ab_plugin_manager.magic_plugin import step_name, after
 from ab_plugin_manager.magic_plugin import MagicPlugin
 from ab_plugin_manager.plugin_manager import PluginManagerImpl
@@ -66,6 +68,22 @@ class MagicOperationsTest(unittest.IsolatedAsyncioTestCase):
             with self.assertRaises(AssertionError):
                 await op("type2")
             self.assertEqual(await op("X3"), "None+decorator")
+
+    def test_wrapper_call_checks(self) -> None:
+        op: WrapperCallOperation[Any, Any, str] = WrapperCallOperation[Any, Any, str]("op").returning_instance_of(str)
+
+        class Plugin1(MagicPlugin):
+            @op.factory_implementation
+            def f1(self, a, b, **_kwargs) -> str:
+                return a + b
+
+        with PluginManagerImpl([Plugin1()]).as_current():
+            self.assertEqual("ab", op("a", "b"))
+
+            with self.assertRaises(MagicOperationResultCheckError) as e:
+                op(1, 2)
+
+            self.assertIs(e.exception.operation, op)
 
 
 if __name__ == "__main__":

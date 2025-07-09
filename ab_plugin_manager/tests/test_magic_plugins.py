@@ -167,7 +167,7 @@ class MagicPluginTest(unittest.TestCase):
         plugin = MagicModulePlugin(module)
 
         self.assertEqual(plugin.name, 'magic plugin module sample')
-        self.assertEqual(plugin.version, '6.6.6')
+        self.assertEqual(plugin.version, '6.6.7')
 
         self.assertEqual(
             list(plugin.get_operation_steps('init')),

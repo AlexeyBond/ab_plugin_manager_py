@@ -20,7 +20,7 @@ try:
 except ImportError:
     from yaml import Loader, Dumper
 
-__all__ = ["ConfigPlugin"]
+__all__ = ["ConfigPluginBase", "ConfigPluginWithAPI", "ConfigPlugin"]
 
 from ab_plugin_manager.magic_plugin import MagicPlugin, step_name
 from ab_plugin_manager.abc import PluginManager, OperationStep, Plugin
@@ -162,9 +162,9 @@ class ConfigurationScope:
         self._stored_hash = self.calc_current_hash()
 
 
-class ConfigPlugin(MagicPlugin):
+class ConfigPluginBase(MagicPlugin):
     name = 'config'
-    version = '1.1.0'
+    version = '1.2.0'
 
     config: dict[str, Any] = {
         'yamlDumpOptions': {
@@ -173,7 +173,7 @@ class ConfigPlugin(MagicPlugin):
             'allow_unicode': True,
         },
         'fileEncoding': 'utf-8',
-        'storeOnRESTUpdate': True,
+        'storeOnRESTUpdate': True,  # TODO: Move to ConfigPluginWithAPI
         'storeOnShutdown': True,
         'watchFileChanges': True,
         'watchMemoryChanges': True,
@@ -470,7 +470,7 @@ class ConfigPlugin(MagicPlugin):
                 self._store_config(scope_name)
 
 
-class ConfigPluginWithAPI(ConfigPlugin):
+class ConfigPluginWithAPI(ConfigPluginBase):
     """
     Добавляет к функциональности ConfigPlugin'а HTTP API для управления конфигурацией
     (если приложение использует плагин веб-сервера).
@@ -559,3 +559,6 @@ class ConfigPluginWithAPI(ConfigPlugin):
 
             if self.config['storeOnRESTUpdate']:
                 self._store_config(scope_name)
+
+
+ConfigPlugin = ConfigPluginWithAPI

@@ -97,7 +97,13 @@ def extract_operations_from(
 ) -> dict[str, Collection[OperationStep]]:
     steps: dict[str, Collection[OperationStep]] = {}
 
-    for attr in dir(obj):
+    annotations = getattr(obj, '__annotations__', {})
+    attributes = getattr(obj, '__all__', None)
+
+    if attributes is None:
+        attributes = dir(obj)
+
+    for attr in attributes:
         if _SPECIAL_ATTRS_RE.match(attr):
             continue
 
@@ -118,6 +124,7 @@ def extract_operations_from(
                 plugin=plugin,
                 dependencies=dependencies,
                 reverse_dependencies=reverse_dependencies,
+                annotation=annotations.get(attr),
             ),
             *steps.get(op_name, ())
         )

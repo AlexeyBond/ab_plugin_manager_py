@@ -1,4 +1,5 @@
 import unittest
+from typing import Any
 
 from ab_plugin_manager.abc import OperationStep
 from ab_plugin_manager.magic_plugin import MagicPlugin, after, before, operation, step_name, MagicModulePlugin
@@ -192,6 +193,40 @@ class MagicPluginTest(unittest.TestCase):
         plugin.foo = upd
         self.assertIs(module.foo, upd)
         self.assertIs(plugin.foo, upd)
+
+    def test_step_annotations(self) -> None:
+        class TestPlugin(MagicPlugin):
+            config: dict[str, Any] = {}
+            foo: str = "bar"
+
+        plugin = TestPlugin()
+
+        self.assertEqual(
+            list(plugin.get_operation_steps("config")),
+            [OperationStep(TestPlugin.config, 'TestPlugin.config', plugin, (), (), dict[str, Any])],
+        )
+        self.assertEqual(
+            list(plugin.get_operation_steps("foo")),
+            [OperationStep(TestPlugin.foo, 'TestPlugin.foo', plugin, (), (), str)],
+        )
+
+    def test_step_annotations_module(self) -> None:
+        import ab_plugin_manager.tests.magic_plugin_sample as module
+
+        plugin = MagicModulePlugin(module)
+
+        self.assertEqual(
+            list(plugin.get_operation_steps("foo")),
+            [OperationStep(module.foo, "magic plugin module sample.foo", plugin, (), (), dict)],
+        )
+
+    def test_module_all(self) -> None:
+        import ab_plugin_manager.tests.magic_plugin_sample as module
+
+        plugin = MagicModulePlugin(module)
+
+        # The function is there, but not included in __all__
+        self.assertEqual([], list(plugin.get_operation_steps("bar")))
 
 
 if __name__ == '__main__':

@@ -469,6 +469,13 @@ class ConfigPlugin(MagicPlugin):
             for scope_name in self._scopes.keys():
                 self._store_config(scope_name)
 
+
+class ConfigPluginWithAPI(ConfigPlugin):
+    """
+    Добавляет к функциональности ConfigPlugin'а HTTP API для управления конфигурацией
+    (если приложение использует плагин веб-сервера).
+    """
+
     def register_fastapi_endpoints(self, router, *_args, **_kwargs) -> None:
         from fastapi import APIRouter, Body, HTTPException  # type : ignore
         from pydantic import BaseModel, Field  # type : ignore

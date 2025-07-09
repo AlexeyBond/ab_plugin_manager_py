@@ -30,6 +30,7 @@ class OperationStep(NamedTuple):
     plugin: 'Plugin'
     dependencies: Collection[str] = ()
     reverse_dependencies: Collection[str] = ()
+    annotation: Optional[Any] = None
 
     def __str__(self):
         return f'{self.plugin}/{self.name}'

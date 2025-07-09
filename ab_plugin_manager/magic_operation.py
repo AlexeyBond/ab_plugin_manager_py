@@ -114,8 +114,17 @@ class MagicOperationWithResultProcessing[TResult, TImpl: Callable](MagicOperatio
 
 
 class CallAllOperation[*TARgs](MagicOperation[Callable[[*TARgs], None]]):
-    def __call__(self, *args: *TARgs, **kwargs) -> None:
+    """
+    Операция, последовательно синхронно выполняющая все шаги.
+    """
+
+    def invoke(self, *args: *TARgs, **kwargs) -> None:
         call_all(self.get_steps(), *args, **kwargs)
+
+    async def ainvoke(self, *args: *TARgs, **kwargs) -> None:
+        await to_thread(self.invoke, *args, **kwargs)
+
+    __call__ = invoke
 
 
 class WrapperCallOperation[*TARgs, TResult](
@@ -252,5 +261,8 @@ class CallAllAsyncConcurrentOperation[*TArgs, TResult](
     """
     Операция, все шаги которой выполняются асинхронно (но с учётом зависимостей).
     """
-    async def __call__(self, *args: *TArgs, **kwargs) -> Collection[Task[TResult]]:
+
+    async def ainvoke(self, *args: *TArgs, **kwargs) -> Collection[Task[TResult]]:
         return await call_all_parallel_async(self.get_steps(), *args, **kwargs)
+
+    __call__ = ainvoke

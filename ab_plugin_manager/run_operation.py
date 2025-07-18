@@ -133,7 +133,7 @@ async def call_all_as_wrappers_async(steps: Iterable[OperationStep], initial: An
         step, *rest = s
         callback = partial(_call_wrapper, rest)
 
-        assert asyncio.iscoroutinefunction(step.step)
+        assert asyncio.iscoroutinefunction(step.step), f"Шаг {step} не является асинхронной функцией"
         return await step.step(callback, prev, *a, **kw)
 
     return await _call_wrapper(tuple(steps), initial, *args, **kwargs)

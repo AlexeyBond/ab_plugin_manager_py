@@ -171,11 +171,17 @@ class WrapperCallOperation[*TARgs, TResult](
     >>>     await op.ainvoke(*args, **kwargs)
     """
 
-    def invoke(self, *args: *TARgs, **kwargs) -> TResult:
-        return self._process_result(call_all_as_wrappers(self.get_steps(), None, *args, **kwargs))
+    def invoke_with_initial(self, initial: Optional[TResult], /, *args: *TARgs, **kwargs) -> TResult:
+        return self._process_result(call_all_as_wrappers(self.get_steps(), initial, *args, **kwargs))
+
+    def invoke(self, *args, **kwargs) -> TResult:
+        return self.invoke_with_initial(None, *args, **kwargs)
+
+    async def ainvoke_with_initial(self, initial: Optional[TResult], *args: *TARgs, **kwargs) -> TResult:
+        return await asyncio.to_thread(partial(self.invoke_with_initial, initial, *args, **kwargs))
 
     async def ainvoke(self, *args: *TARgs, **kwargs) -> TResult:
-        return await asyncio.to_thread(partial(self.invoke, *args, **kwargs))
+        return await self.ainvoke_with_initial(None, *args, **kwargs)
 
     __call__ = invoke
 
@@ -233,9 +239,12 @@ class AsyncWrapperCallOperation[*TARgs, TResult](
     >>>     await op(*args, **kwargs)
     """
 
-    async def ainvoke(self, *args, **kwargs):
-        res = await call_all_as_wrappers_async(self.get_steps(), None, *args, **kwargs)
+    async def ainvoke_with_initial(self, initial: Optional[TResult], /, *args, **kwargs):
+        res = await call_all_as_wrappers_async(self.get_steps(), initial, *args, **kwargs)
         return self._process_result(res)
+
+    async def ainvoke(self, *args, **kwargs):
+        return await self.ainvoke_with_initial(None, *args, **kwargs)
 
     __call__ = ainvoke
 

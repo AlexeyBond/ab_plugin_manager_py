@@ -1,18 +1,22 @@
+from collections import defaultdict
+from collections.abc import Hashable
 from graphlib import TopologicalSorter, CycleError
 from logging import getLogger
-from typing import Iterable, Collection
+from typing import Iterable, Collection, Any, Callable, Optional
 
-from ab_plugin_manager.abc import PluginManager, OperationStep, Plugin, DependencyCycleException
+from ab_plugin_manager.abc import PluginManager, OperationStep, Plugin, DependencyCycleException, \
+    UnlistableOperationSetException
 
 __all__ = ["PluginManagerImpl"]
 
 
 class PluginManagerImpl(PluginManager):
-    __slots__ = ('_plugins', '_logger')
+    __slots__ = ('_plugins', '_logger', '_op_cache')
 
     def __init__(self, plugins: Collection[Plugin], *, logger=getLogger('PluginManager')):
         self._plugins = plugins
         self._logger = logger
+        self._op_cache: defaultdict[str, dict[Hashable, Any]] = defaultdict(dict)
 
     def get_operation_sequence(self, op_name: str) -> Iterable[OperationStep]:
         ts: TopologicalSorter[str] = TopologicalSorter()
@@ -56,3 +60,56 @@ class PluginManagerImpl(PluginManager):
                 ts.done(*node_group)
 
         return iterate()
+
+    def operation_cache(self, op_name: str, key: Hashable, compute: Callable, /, *args, **kwargs) -> Any:
+        operation_scope = self._op_cache[op_name]
+
+        try:
+            return operation_scope[key]
+        except KeyError:
+            pass
+
+        res = compute(*args, **kwargs)
+        operation_scope[key] = res
+
+        return res
+
+    def drop_operation_cache(
+            self,
+            *,
+            operations: Optional[Iterable[str]] = None,
+            keys: Optional[Iterable[Hashable]] = None,
+            plugin: Optional[Plugin] = None,
+            **_kwargs
+    ):
+        op_cache = self._op_cache
+
+        def drop_operation(operation: str):
+            if keys is not None:
+                operation_scope = op_cache.get(operation)
+                if operation_scope is None:
+                    return
+                for key in keys:
+                    del operation_scope[key]
+            else:
+                try:
+                    del op_cache[operation]
+                except KeyError:
+                    pass
+
+        if operations is not None:
+            for op in operations:
+                drop_operation(op)
+            return
+
+        if plugin is not None:
+            try:
+                operations = plugin.list_implemented_operations()
+            except UnlistableOperationSetException:
+                pass
+            else:
+                for op in operations:
+                    drop_operation(op)
+                return
+
+        self._op_cache = defaultdict(dict)

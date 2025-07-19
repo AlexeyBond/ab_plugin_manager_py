@@ -27,12 +27,12 @@ class MagicOperation[TImpl: Callable]:
 
     >>> op.get_steps()
 
-    такой вызов эквивалентен прямому обращению к `PluginManager`'у:
+    такой вызов эквивалентен прямому обращению к `PluginManager`'у (но может кэшировать его результат):
 
     >>> PluginManager.current().get_operation_sequence("my_op")
 
     В плагинах, наследующихся от `MagicPlugin` и модулях-плагинах можно использовать декоратор `implementation` чтобы
-    пометить функцию/метод как реализацию операции, не зависимо от названия:
+    пометить функцию/метод/другой объект как реализацию операции, не зависимо от названия:
 
     >>> @op.implementation
     >>> def foo(...):
@@ -48,18 +48,55 @@ class MagicOperation[TImpl: Callable]:
     >>> def my_op(...):
     >>>     ...
     """
-    __slots__ = ("operation",)
+    __slots__ = ("operation", "cache_steps")
 
     operation: str
+    cache_steps: bool
 
-    def __init__(self, operation: str):
+    def __init__(self, operation: str, *, cache_steps: bool = True):
+        """
+        :param operation: Имя операции
+        :param cache_steps: Нужно ли кэшировать шаги операции.
+                    Желательно явно передавать False для операций, которые выполняются очень редко, например, только при
+                    запуске или остановке приложения.
+        """
         self.operation = operation
+        self.cache_steps = cache_steps
+
+    def get_steps_no_cache(self) -> Iterable[OperationStep]:
+        """
+        Получает шаги операции из текущего PluginManager'а.
+
+        В отличие от `get_steps`, никогда не кэширует результат.
+
+        Raises:
+            CurrentPluginManagerNotSetException - если текущий PluginManager не установлен
+        """
+        return PluginManager.current().get_operation_sequence(self.operation)
 
     def get_steps(self) -> Iterable[OperationStep]:
-        return PluginManager.current().get_operation_sequence(self.operation)
+        """
+        Получает шаги операции из текущего PluginManager'а.
+
+        Может (в зависимости от значения cache_steps) кэшировать результат обращения к PluginManager'у.
+
+        Raises:
+            CurrentPluginManagerNotSetException - если текущий PluginManager не установлен
+        """
+        if not self.cache_steps:
+            return self.get_steps_no_cache()
+
+        return PluginManager.current().operation_cache(
+            self.operation,
+            _OPERATION_STEPS_CACHE_KEY,
+            lambda: list(self.get_steps_no_cache()),
+        )
 
     def implementation(self, fn: TImpl):
         return operation_decorator(self.operation)(fn)
+
+
+_OPERATION_STEPS_CACHE_KEY = id(MagicOperation)
 
 
 class MagicOperationResultCheck[TResult](NamedTuple):
@@ -83,8 +120,8 @@ class MagicOperationWithResultProcessing[TResult, TImpl: Callable](MagicOperatio
 
     _checks: list[MagicOperationResultCheck[TResult]]
 
-    def __init__(self, operation: str):
-        super().__init__(operation)
+    def __init__(self, operation: str, **kwargs):
+        super().__init__(operation, **kwargs)
         self._checks = []
 
     def _process_result(self, res: TResult) -> TResult:

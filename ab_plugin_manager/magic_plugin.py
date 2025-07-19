@@ -162,6 +162,9 @@ class MagicPlugin(Plugin, ABC):
     def get_operation_steps(self, op_name: str) -> Iterable[OperationStep]:
         return self.__steps.get(op_name, ())
 
+    def list_implemented_operations(self) -> Iterable[str]:
+        return self.__steps.keys()
+
 
 class MagicModulePlugin(Plugin):
     __slots__ = ('name', 'version', '_module', '_steps', '__doc__')
@@ -175,6 +178,9 @@ class MagicModulePlugin(Plugin):
 
     def get_operation_steps(self, op_name: str) -> Iterable[OperationStep]:
         return self._steps.get(op_name, ())
+
+    def list_implemented_operations(self) -> Iterable[str]:
+        return self._steps.keys()
 
     def __setattr__(self, key, value):
         if key in self.__slots__:

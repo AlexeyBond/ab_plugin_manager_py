@@ -69,6 +69,17 @@ class PluginDiscoveryPlugin(MagicPlugin):
 
         yield from super().get_operation_steps(op_name)
 
+    def list_implemented_operations(self) -> Iterable[str]:
+        ops = set()
+
+        for plugin in self._plugins:
+            # Может выбросить UnlistableOperationSetException.
+            # Но если любой из загруженых плагинов не может перечислить свои операции, то и мы не можем, так что,
+            # ничего не делаем.
+            ops.update(plugin.list_implemented_operations())
+
+        return ops
+
     @after('config')
     def bootstrap(self, *_args, **_kwargs) -> None:
         sys.path.extend(substitute_patterns(self.config['appendPythonPath']))
@@ -107,6 +118,9 @@ class PluginDiscoveryPlugin(MagicPlugin):
                 )
 
                 self._plugins.append(plugin)
+
+                PluginManager.drop_operation_cache(plugin=plugin)
+
                 call_all(plugin_discovered_op, plugin)
 
     @step_name('discover_python_module')

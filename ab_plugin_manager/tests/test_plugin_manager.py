@@ -114,6 +114,33 @@ class PluginManagerTest(unittest.TestCase):
         with self.assertRaises(CurrentPluginManagerNotSetException):
             PluginManager.current()
 
+    def test_op_cache(self):
+        pm = PluginManagerImpl([])
+
+        def compute(foo):
+            return {foo: "bar"}
+
+        val1 = pm.operation_cache("test", 1, compute, foo="f00")
+
+        self.assertIs(pm.operation_cache("test", 1, compute), val1)
+
+        # Different key
+        self.assertIsNot(pm.operation_cache("test", 2, compute, "f00"), val1)
+        # Different op
+        self.assertIsNot(pm.operation_cache("test1", 1, compute, foo="f00"), val1)
+
+    def test_op_cache_drop(self):
+        pm = PluginManagerImpl([])
+
+        def compute(foo):
+            return {foo: "bar"}
+
+        val1 = pm.operation_cache("test", 1, compute, "f00")
+
+        pm.drop_operation_cache()
+
+        self.assertIsNot(pm.operation_cache("test", 1, compute, "f00"), val1)
+
 
 class PluginManagerTestAsync(IsolatedAsyncioTestCase):
     async def test_current_async(self):

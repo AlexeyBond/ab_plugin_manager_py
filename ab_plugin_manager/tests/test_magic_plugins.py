@@ -228,6 +228,32 @@ class MagicPluginTest(unittest.TestCase):
         # The function is there, but not included in __all__
         self.assertEqual([], list(plugin.get_operation_steps("bar")))
 
+    def test_list_operations(self) -> None:
+        class TestPlugin(MagicPlugin):
+            name = 'test'
+            version = '4.2.0'
+
+            def __init__(self):
+                self._private1 = 1
+                super().__init__()
+
+            _private2 = 2
+
+            def init(self):
+                ...
+
+        self.assertSetEqual(
+            set(TestPlugin().list_implemented_operations()),
+            {"init"},
+        )
+
+        import ab_plugin_manager.tests.magic_plugin_sample as module
+
+        self.assertSetEqual(
+            set(MagicModulePlugin(module).list_implemented_operations()),
+            {"init", "terminate", "foo"},
+        )
+
 
 if __name__ == '__main__':
     unittest.main()

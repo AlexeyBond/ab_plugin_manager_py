@@ -306,9 +306,24 @@ class CallAllAsyncConcurrentOperation[*TArgs, TResult](
 ):
     """
     Операция, все шаги которой выполняются асинхронно (но с учётом зависимостей).
+
+    Оператор вызова и метод `ainvoke` возвращают список асинхронных `Task`'ов, не дожидаясь их завершения.
+    Это позволяет более гибко обрабатывать ошибки, возникающие при выполнении операции и управлять завершением
+    выполнения операции.
+    В простых случаях, когда нужно просто выполнить все шаги операции, можно использовать метод `ainvoke_all`
+    дожидающийся завершения всех шагов и не возвращающий ничего.
     """
 
     async def ainvoke(self, *args: *TArgs, **kwargs) -> Collection[Task[TResult]]:
+        """
+        Запускает все шаги операции и возвращает созданные для них Task'и.
+        """
         return await call_all_parallel_async(self.get_steps(), *args, **kwargs)
 
     __call__ = ainvoke
+
+    async def ainvoke_all(self,  *args: *TArgs, **kwargs) -> None:
+        """
+        Запускает все шаги операции и дожидается их завершения.
+        """
+        await asyncio.gather(self.ainvoke(*args, **kwargs))

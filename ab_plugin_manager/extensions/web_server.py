@@ -1,10 +1,11 @@
 import asyncio
 from logging import getLogger
-from typing import Optional, Callable
+from typing import Optional, Callable, Iterable
 
 import uvicorn  # type: ignore
 from fastapi import FastAPI, APIRouter  # type: ignore
 
+from ab_plugin_manager.abc import OperationStep
 from ab_plugin_manager.magic_operation import CallAllOperation, MagicOperation
 from ab_plugin_manager.magic_plugin import MagicPlugin, step_name
 
@@ -12,10 +13,12 @@ __all__ = [
     "WebServerPlugin",
     "register_fastapi_endpoints_op",
     "register_fastapi_routes_op",
+    "fastapi_tags_op",
 ]
 
 register_fastapi_routes_op = CallAllOperation[FastAPI]("register_fastapi_routes")
 register_fastapi_endpoints_op = MagicOperation[Callable[[APIRouter], None]]("register_fastapi_endpoints")
+fastapi_tags_op = MagicOperation("fastapi_tags")
 
 
 class WebServerPlugin(MagicPlugin):
@@ -55,13 +58,36 @@ class WebServerPlugin(MagicPlugin):
 
         return app
 
+    def _get_fastapi_tags_for_tags_step(self, tags_step: OperationStep) -> Iterable[str]:
+        if isinstance(tags_step.step, str):
+            return (tags_step.step, )
+        if isinstance(tags_step.step, Iterable):
+            return tags_step.step
+
+        self._logger.warning("Шаг %s не является тэгом или списком тэгов", tags_step)
+
+        return ()
+
+    def _get_fastapi_tags_for_routes_op(self, routes_step: OperationStep) -> list[str]:
+        result = []
+
+        for tags_step in routes_step.plugin.get_operation_steps(fastapi_tags_op.operation):
+            for tag in self._get_fastapi_tags_for_tags_step(tags_step):
+                if not isinstance(tag, str):
+                    self._logger.warning("Тэг, возвращённый из %s не является строкой: %s", tags_step, tag)
+                    continue
+                result.append(tag)
+
+        return result
+
     @step_name('register_plugin_api_endpoints')
     @register_fastapi_routes_op.implementation
     def register_fastapi_routes(self, app: FastAPI, *_args, **_kwargs):
         api_root_router = APIRouter()
 
         for step in register_fastapi_endpoints_op.get_steps():
-            router = APIRouter()
+            tags = self._get_fastapi_tags_for_routes_op(step)
+            router = APIRouter(tags=tags)
 
             step.step(router)
 

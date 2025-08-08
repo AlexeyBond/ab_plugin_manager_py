@@ -1,6 +1,11 @@
 from hashlib import sha256
 from typing import Any, Callable
 
+try:
+    from pydantic import BaseModel
+except ImportError:
+    BaseModel = None
+
 __all__ = ["make_stable_hash_fn", "snapshot_hash"]
 
 
@@ -45,5 +50,13 @@ def snapshot_hash(obj: Any, base_hash: Callable[[Any], int] = make_stable_hash_f
 
     elif isinstance(obj, list):
         obj = tuple(snapshot_hash(it, base_hash) for it in obj)
+    elif BaseModel is not None and isinstance(obj, BaseModel):
+        model = obj.__class__
+        h = base_hash(model)
+
+        for k in model.model_fields:
+            h = h ^ base_hash((k, snapshot_hash(getattr(obj, k), base_hash)))
+
+        return h
 
     return base_hash(obj)

@@ -1,5 +1,6 @@
 import hashlib
 import unittest
+from typing import Any
 
 from ab_plugin_manager.utils.snapshot_hash import snapshot_hash, make_stable_hash_fn
 
@@ -32,6 +33,32 @@ class SnapshotHashTest(unittest.TestCase):
         self.assertEqual(
             snapshot_hash({'foo': ['bar']}, make_stable_hash_fn(hashlib.md5)),
             59139101794391242901173294103234746387
+        )
+
+    def test_hash_pydantic_model(self):
+        from pydantic import BaseModel
+
+        class M(BaseModel):
+            x: int
+            d: dict[str, Any]
+
+        self.assertEqual(
+            snapshot_hash(M(x=1, d={'z': 2})),
+            snapshot_hash(M(x=1, d={'z': 2})),
+        )
+
+        self.assertNotEqual(
+            snapshot_hash(M(x=1, d={'z': 2})),
+            {'x': 1, 'd': {'z': 2}},
+        )
+
+        self.assertNotEqual(
+            snapshot_hash(M(x=2, d={'z': 2})),
+            snapshot_hash(M(x=1, d={'z': 2})),
+        )
+        self.assertNotEqual(
+            snapshot_hash(M(x=1, d={'z': 2})),
+            snapshot_hash(M(x=1, d={'Z': 2})),
         )
 
 

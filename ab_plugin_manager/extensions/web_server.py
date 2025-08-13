@@ -72,11 +72,12 @@ class WebServerPlugin(MagicPlugin):
         result = []
 
         for tags_step in routes_step.plugin.get_operation_steps(fastapi_tags_op.operation):
-            for tag in self._get_fastapi_tags_for_tags_step(tags_step):
-                if not isinstance(tag, str):
-                    self._logger.warning("Тэг, возвращённый из %s не является строкой: %s", tags_step, tag)
-                    continue
-                result.append(tag)
+            if tags_step.plugin is routes_step.plugin:
+                for tag in self._get_fastapi_tags_for_tags_step(tags_step):
+                    if not isinstance(tag, str):
+                        self._logger.warning("Тэг, возвращённый из %s не является строкой: %s", tags_step, tag)
+                        continue
+                    result.append(tag)
 
         return result
 

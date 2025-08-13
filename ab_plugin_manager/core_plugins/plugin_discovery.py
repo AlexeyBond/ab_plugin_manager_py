@@ -119,7 +119,7 @@ class PluginDiscoveryPlugin(MagicPlugin):
 
                 self._plugins.append(plugin)
 
-                PluginManager.drop_operation_cache(plugin=plugin)
+                PluginManager.current().drop_operation_cache(plugin=plugin)
 
                 call_all(plugin_discovered_op, plugin)
 

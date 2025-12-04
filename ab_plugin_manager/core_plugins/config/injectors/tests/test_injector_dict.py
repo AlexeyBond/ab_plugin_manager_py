@@ -1,7 +1,7 @@
 import unittest
 
 from ab_plugin_manager.core_plugins.config.abc import UnsupportedConfigTypeException
-from ab_plugin_manager.core_plugins.config.injector_dict import DictConfigInjector
+from ab_plugin_manager.core_plugins.config.injectors.injector_dict import DictConfigInjectorFactory
 from ab_plugin_manager.magic_plugin import MagicPlugin
 
 
@@ -17,7 +17,9 @@ class DictInjectorTest(unittest.TestCase):
         self._plugin = TestPlugin()
 
     def test_simple_config(self):
-        injector = DictConfigInjector.try_instantiate(next(iter(self._plugin.get_operation_steps("config1"))))
+        injector = DictConfigInjectorFactory().try_instantiate(
+            next(iter(self._plugin.get_operation_steps("config1"))),
+        )
 
         self.assertEqual(
             {"foo": "bar", "buz": "baz"},
@@ -44,10 +46,10 @@ class DictInjectorTest(unittest.TestCase):
 
     def test_bad_config(self):
         with self.assertRaises(UnsupportedConfigTypeException):
-            DictConfigInjector.try_instantiate(next(iter(self._plugin.get_operation_steps("config2"))))
+            DictConfigInjectorFactory().try_instantiate(next(iter(self._plugin.get_operation_steps("config2"))))
 
     def test_schema(self):
-        injector = DictConfigInjector.try_instantiate(next(iter(self._plugin.get_operation_steps("config1"))))
+        injector = DictConfigInjectorFactory().try_instantiate(next(iter(self._plugin.get_operation_steps("config1"))))
         self.assertEqual(
             {"type": "object", "additionalProperties": True, "description": "This is test plugin config"},
             injector.get_schema(),

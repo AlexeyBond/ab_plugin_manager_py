@@ -4,7 +4,7 @@ from typing import Optional
 from pydantic import BaseModel, ValidationError, ConfigDict
 
 from ab_plugin_manager.core_plugins.config.abc import UnsupportedConfigTypeException
-from ab_plugin_manager.core_plugins.config.injector_pydantic import PydanticConfigInjector
+from ab_plugin_manager.core_plugins.config.injectors.injector_pydantic import PydanticConfigInjectorFactory
 from ab_plugin_manager.magic_plugin import MagicPlugin
 
 
@@ -31,7 +31,9 @@ class PydanticInjectorTest(unittest.TestCase):
         self._plugin = TestPlugin()
 
     def test_valid_config(self):
-        injector = PydanticConfigInjector.try_instantiate(next(iter(self._plugin.get_operation_steps("config1"))))
+        injector = PydanticConfigInjectorFactory().try_instantiate(
+            next(iter(self._plugin.get_operation_steps("config1"))),
+        )
 
         self.assertEqual(
             {"foo": "bar", "buz": "baz", "bzz": None},
@@ -58,17 +60,21 @@ class PydanticInjectorTest(unittest.TestCase):
         self.assertNotEqual(hash1, hash2)
 
     def test_invalid_injection(self):
-        injector = PydanticConfigInjector.try_instantiate(next(iter(self._plugin.get_operation_steps("config1"))))
+        injector = PydanticConfigInjectorFactory().try_instantiate(
+            next(iter(self._plugin.get_operation_steps("config1"))),
+        )
 
         with self.assertRaises(ValidationError):
             injector.inject_config({"foo": {"bar": "yes"}})
 
     def test_unsupported_config_type(self):
         with self.assertRaises(UnsupportedConfigTypeException):
-            PydanticConfigInjector.try_instantiate(next(iter(self._plugin.get_operation_steps("config2"))))
+            PydanticConfigInjectorFactory().try_instantiate(next(iter(self._plugin.get_operation_steps("config2"))))
 
     def test_schema(self):
-        injector = PydanticConfigInjector.try_instantiate(next(iter(self._plugin.get_operation_steps("config1"))))
+        injector = PydanticConfigInjectorFactory().try_instantiate(
+            next(iter(self._plugin.get_operation_steps("config1"))),
+        )
 
         self.assertEqual(
             injector.get_schema(),

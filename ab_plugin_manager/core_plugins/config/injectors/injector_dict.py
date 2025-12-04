@@ -2,7 +2,8 @@ from textwrap import dedent
 from typing import Any, Optional
 
 from ab_plugin_manager.abc import OperationStep
-from ab_plugin_manager.core_plugins.config.abc import ConfigInjector, RawConfig, UnsupportedConfigTypeException
+from ab_plugin_manager.core_plugins.config.abc import ConfigInjector, RawConfig, UnsupportedConfigTypeException, \
+    ConfigInjectorFactory
 from ab_plugin_manager.utils.snapshot_hash import snapshot_hash
 
 
@@ -28,18 +29,19 @@ class DictConfigInjector(ConfigInjector):
 
         return schema
 
-    @classmethod
-    def try_instantiate(cls, step: OperationStep) -> 'ConfigInjector':
+
+class DictConfigInjectorFactory(ConfigInjectorFactory):
+    def try_instantiate(self, step: OperationStep) -> ConfigInjector:
         if not isinstance(step.step, dict):
             raise UnsupportedConfigTypeException()
 
         comments = []
 
         for comment_step in step.plugin.get_operation_steps("config_comment"):
-            if isinstance(step_comment := comment_step.step, str):
+            if comment_step.plugin is step.plugin and isinstance(step_comment := comment_step.step, str):
                 comments.append(dedent(step_comment).strip())
 
         if len(comments) == 0:
             comments.append(f"Настройки плагина {step.plugin}")
 
-        return cls(step.step, '\n'.join(comments))
+        return DictConfigInjector(step.step, '\n'.join(comments))

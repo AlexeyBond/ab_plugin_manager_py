@@ -3,7 +3,8 @@ from typing import Any, Optional
 from pydantic import BaseModel
 
 from ab_plugin_manager.abc import OperationStep
-from ab_plugin_manager.core_plugins.config.abc import ConfigInjector, RawConfig, UnsupportedConfigTypeException
+from ab_plugin_manager.core_plugins.config.abc import ConfigInjector, RawConfig, UnsupportedConfigTypeException, \
+    ConfigInjectorFactory
 from ab_plugin_manager.utils.snapshot_hash import snapshot_hash
 
 
@@ -31,9 +32,10 @@ class PydanticConfigInjector(ConfigInjector):
 
         return self._schema
 
-    @classmethod
-    def try_instantiate(cls, step: OperationStep) -> ConfigInjector:
+
+class PydanticConfigInjectorFactory(ConfigInjectorFactory):
+    def try_instantiate(self, step: OperationStep) -> ConfigInjector:
         if not isinstance(step.step, BaseModel):
             raise UnsupportedConfigTypeException()
 
-        return cls(step.step)
+        return PydanticConfigInjector(step.step)

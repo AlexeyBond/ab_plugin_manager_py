@@ -2,7 +2,8 @@ import unittest
 from typing import Any
 
 from ab_plugin_manager.abc import OperationStep
-from ab_plugin_manager.magic_plugin import MagicPlugin, after, before, operation, step_name, MagicModulePlugin
+from ab_plugin_manager.magic_plugin import MagicPlugin, after, before, operation, step_name, MagicModulePlugin, \
+    not_operation
 
 
 class MagicPluginTest(unittest.TestCase):
@@ -140,6 +141,19 @@ class MagicPluginTest(unittest.TestCase):
         self.assertEqual(
             list(plugin.get_operation_steps('__str__')),
             []
+        )
+
+    def test_not_operation(self):
+        class TestPlugin(MagicPlugin):
+            @not_operation
+            def init(self):
+                ...
+
+        plugin = TestPlugin()
+
+        self.assertEqual(
+            list(plugin.get_operation_steps('init')),
+            [],
         )
 
     def test_ignore_plugin_abc_members(self):

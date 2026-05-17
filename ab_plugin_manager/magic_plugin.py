@@ -1,11 +1,11 @@
 import re
 from abc import ABC
 from types import ModuleType
-from typing import Iterable, Collection, Callable
+from typing import Iterable, Collection, Callable, Optional
 
 from ab_plugin_manager.abc import Plugin, OperationStep
 
-__all__ = ["operation", "after", "before", "step_name", "MagicPlugin", "MagicModulePlugin"]
+__all__ = ["operation", "not_operation", "after", "before", "step_name", "MagicPlugin", "MagicModulePlugin"]
 
 _MAGIC_PLUGIN_OP_NAME = '__mp_op_name'
 _MAGIC_PLUGIN_DEPENDENCIES = '__mp_dependencies'
@@ -27,6 +27,14 @@ def operation[T](op_name: str) -> Callable[[T], T]:
         return f
 
     return decorator
+
+
+def not_operation[T](f: T) -> T:
+    """
+    Помечает аттрибут магического плагина как не являющийся шагом какой-либо операции.
+    """
+    setattr(f, _MAGIC_PLUGIN_OP_NAME, None)
+    return f
 
 
 def after[T](*dependencies) -> Callable[[T], T]:
@@ -109,7 +117,11 @@ def extract_operations_from(
 
         value = getattr(obj, attr)
 
-        op_name: str = getattr(value, _MAGIC_PLUGIN_OP_NAME, attr)
+        op_name: Optional[str] = getattr(value, _MAGIC_PLUGIN_OP_NAME, attr)
+
+        if op_name is None:
+            continue
+
         name: str = getattr(value, _MAGIC_PLUGIN_STEP_NAME,
                             None) or f'{plugin.name}.{attr}'
         dependencies: Collection[str] = getattr(

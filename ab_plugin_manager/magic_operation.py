@@ -5,7 +5,7 @@ from functools import wraps, partial
 from typing import Callable, Iterable, Union, Awaitable, Collection, Optional, NamedTuple, Self, Type
 
 from ab_plugin_manager.abc import PluginManager, OperationStep
-from ab_plugin_manager.magic_plugin import operation as operation_decorator
+from ab_plugin_manager.magic_plugin import operation as operation_decorator, not_operation as not_operation_decorator
 from ab_plugin_manager.run_operation import call_all_as_wrappers, call_all, call_all_parallel_async, \
     call_all_as_wrappers_async
 
@@ -17,7 +17,7 @@ def _is_method(fn) -> bool:
     return len(args) > 0 and args[0] == "self"
 
 
-class MagicOperation[TImpl: Callable]:
+class MagicOperation[TImpl]:
     """
     Базовый класс для объявлений операций.
 
@@ -48,7 +48,7 @@ class MagicOperation[TImpl: Callable]:
     >>> def my_op(...):
     >>>     ...
     """
-    __slots__ = ("operation", "cache_steps")
+    __slots__ = ("operation", "cache_steps", "__dict__")
 
     operation: str
     cache_steps: bool
@@ -62,6 +62,7 @@ class MagicOperation[TImpl: Callable]:
         """
         self.operation = operation
         self.cache_steps = cache_steps
+        not_operation_decorator(self)
 
     def get_steps_no_cache(self) -> Iterable[OperationStep]:
         """
@@ -111,7 +112,7 @@ class MagicOperationResultCheckError(AssertionError):
         self.check = check
 
 
-class MagicOperationWithResultProcessing[TResult, TImpl: Callable](MagicOperation[TImpl], ABC):
+class MagicOperationWithResultProcessing[TResult, TImpl](MagicOperation[TImpl], ABC):
     """
     Операция, возвращающая какой-то результат и позволяющая добавлять статические проверки этого результата.
     """
@@ -322,7 +323,7 @@ class CallAllAsyncConcurrentOperation[*TArgs, TResult](
 
     __call__ = ainvoke
 
-    async def ainvoke_all(self,  *args: *TArgs, **kwargs) -> None:
+    async def ainvoke_all(self, *args: *TArgs, **kwargs) -> None:
         """
         Запускает все шаги операции и дожидается их завершения.
         """

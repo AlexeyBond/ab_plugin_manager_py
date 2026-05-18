@@ -341,6 +341,8 @@ class MiddlewareOperation[TArg, TRes](MagicOperation[AnyMiddlewareGeneratorFn[TA
     >>>     yield new_item
     """
 
+    __slots__ = ('arg_type', 'res_type')
+
     arg_type: Type[TArg]
     res_type: Type[TRes]
 
@@ -364,7 +366,7 @@ class MiddlewareOperation[TArg, TRes](MagicOperation[AnyMiddlewareGeneratorFn[TA
     def get_implementation(self) -> MiddlewareImplementation[TArg, TRes]:
         return PluginManager.current().operation_cache(
             self.operation,
-            _MIDDLEWARE_IMPLEMENTATION_CACHE_KEY,
+            id(self),
             MiddlewareOperation._compute_implementation,
             self,
         )
@@ -386,6 +388,3 @@ class MiddlewareOperation[TArg, TRes](MagicOperation[AnyMiddlewareGeneratorFn[TA
             **kwargs,
     ) -> TRes:
         return await self.get_implementation().run_async(wrapped, arg, **kwargs)
-
-
-_MIDDLEWARE_IMPLEMENTATION_CACHE_KEY = id(MiddlewareOperation)

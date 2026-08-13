@@ -12,6 +12,7 @@ from typing import Any, Iterable, Optional, Collection, TypedDict
 
 import yaml  # type: ignore
 
+from ab_plugin_manager.extensions.jobs import JobRunMode, apply_run_mode
 from ab_plugin_manager.file_patterns import match_files, first_substitution, substitute_pattern
 from ab_plugin_manager.utils.snapshot_hash import snapshot_hash
 
@@ -215,8 +216,10 @@ class ConfigPluginBase(MagicPlugin):
             config: Optional[_Config] = None,
             *,
             template_paths: Collection[str] = (),
+            watch_run_mode: JobRunMode = 'run',
     ):
         self.config = type(self).config.copy() if config is None else config
+        apply_run_mode(self, watch_run_mode, 'run')
 
         super().__init__()
 
@@ -465,6 +468,7 @@ class ConfigPluginBase(MagicPlugin):
                 except Exception:
                     _logger.exception("Ошибка при обработке изменений в конфигурации %s", scope_name)
 
+    @step_name('watch-config')
     async def run(self, *_args, **_kwargs):
         while True:
             await asyncio.sleep(self.config['watchIntervalSeconds'])

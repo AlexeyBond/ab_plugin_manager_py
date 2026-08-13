@@ -1,14 +1,15 @@
 import asyncio
 from enum import Enum
 from logging import getLogger
-from typing import Optional, Callable, Iterable, Collection, Literal
+from typing import Optional, Callable, Iterable, Collection
 
 import uvicorn  # type: ignore
 from fastapi import FastAPI, APIRouter  # type: ignore
 
 from ab_plugin_manager.abc import OperationStep
+from ab_plugin_manager.extensions.jobs import JobRunMode, apply_run_mode
 from ab_plugin_manager.magic_operation import CallAllOperation, MagicOperation
-from ab_plugin_manager.magic_plugin import MagicPlugin, step_name, operation
+from ab_plugin_manager.magic_plugin import MagicPlugin, step_name
 
 __all__ = [
     "WebServerPlugin",
@@ -45,10 +46,9 @@ class WebServerPlugin(MagicPlugin):
     def __init__(
             self,
             app_name: str = "Web-приложение",
-            run_mode: Literal['run', 'job', 'default_job'] = 'run',
+            run_mode: JobRunMode = 'run',
     ) -> None:
-        if run_mode != 'run':
-            setattr(self, 'run', operation(run_mode)(type(self).run).__get__(self))
+        apply_run_mode(self, run_mode, 'run')
 
         super().__init__()
 

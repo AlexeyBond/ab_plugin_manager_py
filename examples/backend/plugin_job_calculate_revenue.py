@@ -11,8 +11,5 @@ version = '0.0.1'
 @job_op.implementation
 async def calculate_revenue():
     print('Calculating daily revenue...')
-    await asyncio.sleep(10)
+    await asyncio.sleep(3)
     print('It\'s 0. What did you expect?')
-
-    # Явно завершаем процесс, чтобы фоновые задачи не заставили его зависнуть.
-    exit(0)

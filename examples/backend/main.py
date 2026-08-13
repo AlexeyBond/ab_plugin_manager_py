@@ -42,7 +42,9 @@ if __name__ == '__main__':
             ],
         }),
         # Плагин, управляющий настройками плагинов
-        ConfigPluginWithAPI(),
+        ConfigPluginWithAPI(
+            watch_run_mode='default_job',
+        ),
         # Плагин, настраивающий логгеры
         LoggingPlugin(),
         # Плагин, позволяющий запускать различные задачи через одну точку входа

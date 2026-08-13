@@ -1,10 +1,10 @@
 from argparse import ArgumentParser
 from logging import getLogger
-from typing import Awaitable, Callable, Iterable
+from typing import Awaitable, Callable, Iterable, Literal
 
 from ab_plugin_manager.abc import OperationStep
 from ab_plugin_manager.magic_operation import MagicOperation
-from ab_plugin_manager.magic_plugin import MagicPlugin, step_name
+from ab_plugin_manager.magic_plugin import MagicPlugin, step_name, before, operation
 from ab_plugin_manager.operations import run as run_op
 
 default_job_op = MagicOperation[Callable[..., None | Awaitable[None]]]('default_job')
@@ -16,6 +16,27 @@ job_op = MagicOperation[Callable[..., Awaitable[None]]]('job')
 """
 Задачи, которые нужно запускать только по явному запросу (через параметр командной строки).
 """
+
+type JobRunMode = Literal['run', 'job', 'default_job']
+
+
+def apply_run_mode(plugin: MagicPlugin, mode: JobRunMode, member: str):
+    """
+    Позволяет выбирать, как запускается один из методов плагина - как реализация операции run, операции job или
+    операции default_job.
+
+    Функция предназначена в первую очередь для универсальных плагинов ядра, которые можно настраивать под потребности
+    конкретного приложения через параметры конструктора.
+    """
+    if mode == 'run' and member == 'run':
+        return
+
+    member_value = getattr(type(plugin), member)
+    setattr(
+        plugin,
+        member,
+        operation(mode)(member_value).__get__(plugin),
+    )
 
 
 class JobsPlugin(MagicPlugin):
@@ -74,9 +95,6 @@ class JobsPlugin(MagicPlugin):
             print('Optional jobs:')
             for job in jobs:
                 print(f"{job.name} (registered by {job.plugin})")
-
-        if len(self._job_settings) == 1:
-            exit(0)
 
     def _jobs_to_run_steps(self) -> Iterable[OperationStep]:
         running_default_job_names = set()

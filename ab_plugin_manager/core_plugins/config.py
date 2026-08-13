@@ -8,7 +8,7 @@ from pathlib import Path
 from shutil import copyfile
 from textwrap import dedent
 from threading import Event
-from typing import Any, Iterable, Optional, Collection
+from typing import Any, Iterable, Optional, Collection, TypedDict
 
 import yaml  # type: ignore
 
@@ -166,7 +166,16 @@ class ConfigPluginBase(MagicPlugin):
     name = 'config'
     version = '1.2.0'
 
-    config: dict[str, Any] = {
+    class _Config(TypedDict):
+        yamlDumpOptions: dict[str, Any]
+        fileEncoding: str
+        storeOnRESTUpdate: bool
+        storeOnShutdown: bool
+        watchFileChanges: bool
+        watchMemoryChanges: bool
+        watchIntervalSeconds: int
+
+    config: _Config = {
         'yamlDumpOptions': {
             'default_flow_style': False,
             'encoding': 'utf-8',
@@ -201,7 +210,14 @@ class ConfigPluginBase(MagicPlugin):
     изменения внесённые в памяти и, соответственно, файл конфигурации будет перезаписан.
     """
 
-    def __init__(self, *, template_paths: Collection[str] = ()):
+    def __init__(
+            self,
+            config: Optional[_Config] = None,
+            *,
+            template_paths: Collection[str] = (),
+    ):
+        self.config = type(self).config.copy() if config is None else config
+
         super().__init__()
 
         self._scopes: dict[str, ConfigurationScope] = {}
@@ -476,9 +492,11 @@ class ConfigPluginWithAPI(ConfigPluginBase):
     (если приложение использует плагин веб-сервера).
     """
 
+    name = 'config'
+
     def register_fastapi_endpoints(self, router, *_args, **_kwargs) -> None:
-        from fastapi import APIRouter, Body, HTTPException  # type : ignore
-        from pydantic import BaseModel, Field  # type : ignore
+        from fastapi import APIRouter, Body, HTTPException  # type: ignore[import-not-found]
+        from pydantic import BaseModel, Field  # type: ignore[import-not-found]
 
         r: APIRouter = router
 

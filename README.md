@@ -17,25 +17,21 @@ from ab_plugin_manager.launcher import launch_application
 register_variable("package_root", os.path.dirname(__file__))
 
 
-# Плагин, осуществляющий динамическую загрузку плагинов.
-# В данном случае, просто PluginDiscoveryPlugin с изменёнными настройками.
-class MyPluginDiscoveryPlugin(PluginDiscoveryPlugin):
-    name = "discover_plugins"
-    config = {
-        **PluginDiscoveryPlugin.config,
-        "pluginPaths": [
-            # Ищем плагины внутри пакета приложения
-            "{package_root}/**/plugin_*.py",
-            # и среди других питоновских пакетов
-            "{python_path}/myapp_plugin_*/**/plugin_*.py",
-        ],
-    }
-
-
 if __name__ == '__main__':
     # launch_application получает на вход набор предварительно загруженных плагинов ядра (как минимум - плагин для загрузки других плагинов)
     # и блокирует поток выполнения до завершения работы приложения.
-    launch_application([MyPluginDiscoveryPlugin()])
+    launch_application([
+        # Плагин для динамической загрузки других плагинов
+        PluginDiscoveryPlugin(config={
+            **PluginDiscoveryPlugin.config,
+            "pluginPaths": [
+                # Ищем плагины внутри пакета приложения
+                "{package_root}/**/plugin_*.py",
+                # и среди других питоновских пакетов
+                "{python_path}/myapp_plugin_*/**/plugin_*.py",
+            ],
+        }),
+    ])
 ```
 
 Вся логика приложения располагается в плагинах.

@@ -2,6 +2,7 @@ import unittest
 from unittest.async_case import IsolatedAsyncioTestCase
 
 from ab_plugin_manager.magic_operations import MiddlewareOperation
+from ab_plugin_manager.magic_operations.middleware import UnexpectedMiddlewareValue
 from ab_plugin_manager.magic_plugin import MagicPlugin, step_name, after, before
 from ab_plugin_manager.plugin_manager import PluginManagerImpl
 
@@ -77,7 +78,7 @@ class MiddlewareOperationTest(IsolatedAsyncioTestCase):
         with PluginManagerImpl([P1()]).as_current():
             self.assertEqual(
                 op.invoke(
-                    lambda dec: f"[{dec['text']}]",
+                    lambda dec, **_kw: f"[{dec['text']}]",
                     {'text': 'hellorld'},
                 ),
                 '(p12)(p22)[(p21)(p11)hellorld(s11)(s21)](s22)(s12)',
@@ -146,7 +147,7 @@ class MiddlewareOperationTest(IsolatedAsyncioTestCase):
         with PluginManagerImpl([P2()]).as_current():
             with self.assertRaisesRegex(
                     RuntimeError,
-                    "Operation can not run synchronously as it has asynchronous steps",
+                    "Operation can not run synchronously as it has asynchronous",
             ):
                 op.invoke(
                     lambda _: ...,
@@ -155,7 +156,7 @@ class MiddlewareOperationTest(IsolatedAsyncioTestCase):
 
     async def test_async_decorators(self):
         with PluginManagerImpl([P2()]).as_current():
-            async def f(dec: dict, **_kwargs):
+            async def f(dec: dict, *_a, **_kwargs):
                 return f"[{dec['text']}]"
 
             self.assertEqual(
@@ -189,6 +190,59 @@ class MiddlewareOperationTest(IsolatedAsyncioTestCase):
                 '(p12)the error(s12)',
             )
 
+    def test_unexpected_sync_yield_value(self):
+        class P(MagicPlugin):
+            @op.implementation
+            def i1(self, _dec: dict, **_kwargs):
+                yield 'foo'
+
+        with PluginManagerImpl([P()]).as_current():
+            with self.assertRaises(UnexpectedMiddlewareValue) as e:
+                op.invoke(lambda _: ..., {})
+
+            self.assertEqual(e.exception.value, 'foo')
+            self.assertEqual(e.exception.kind, 'yield')
+
+    def test_unexpected_sync_return_value_backward(self):
+        class P(MagicPlugin):
+            @op.implementation
+            def i1(self, dec: dict, **_kwargs):
+                yield dec
+                return 42
+
+        with PluginManagerImpl([P()]).as_current():
+            with self.assertRaises(UnexpectedMiddlewareValue) as e:
+                op.invoke(lambda _: 'foo', {})
+
+            self.assertEqual(e.exception.value, 42)
+            self.assertEqual(e.exception.kind, 'return')
+
+    def test_unexpected_sync_return_value_forward(self):
+        class P(MagicPlugin):
+            @op.implementation
+            def i1(self, _dec: dict, **_kwargs):
+                if False: yield
+                return 42
+
+        with PluginManagerImpl([P()]).as_current():
+            with self.assertRaises(UnexpectedMiddlewareValue) as e:
+                op.invoke(lambda _, **_kw: 'foo', {})
+
+            self.assertEqual(e.exception.value, 42)
+            self.assertEqual(e.exception.kind, 'return')
+
+    async def test_unexpected_async_value_forward(self):
+        class P(MagicPlugin):
+            @op.implementation
+            async def i1(self, _dec: dict, **_kwargs):
+                yield 42
+
+        with PluginManagerImpl([P()]).as_current():
+            with self.assertRaises(UnexpectedMiddlewareValue) as e:
+                await op.ainvoke(lambda _: ..., {})
+
+            self.assertEqual(e.exception.value, 42)
+            self.assertEqual(e.exception.kind, 'yield')
 
 if __name__ == '__main__':
     unittest.main()

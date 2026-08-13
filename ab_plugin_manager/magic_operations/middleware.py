@@ -1,18 +1,18 @@
 from dataclasses import dataclass
 from inspect import isgeneratorfunction
-from typing import Generator, TypeVar, Callable, AsyncGenerator, Optional, Sequence, Any, Type, NamedTuple, Literal, \
-    Awaitable, Self, cast
+from typing import Generator, AsyncGenerator, Optional, Sequence, Any, Type, NamedTuple, Literal, \
+    Self, cast, Protocol
 
 from ab_plugin_manager.abc import OperationStep, PluginManager
 from ab_plugin_manager.magic_operation import MagicOperation
 
 
-@dataclass(frozen=True)
+@dataclass
 class MiddlewareError(RuntimeError):
     step: Optional[OperationStep] = None
 
 
-@dataclass(frozen=True)
+@dataclass
 class UnexpectedMiddlewareValue(MiddlewareError):
     value: Any = None
     kind: Literal['yield', 'return'] = 'yield'
@@ -30,24 +30,39 @@ class UnsupportedMiddlewareType(MiddlewareError):
     ...
 
 
-TArg = TypeVar('TArg')
-TRes = TypeVar('TRes')
+type SyncMiddlewareGenerator[TArg, TRes] = Generator[TArg, TRes, TRes]
 
-SyncMiddlewareGenerator = Generator[TArg, TRes, TRes]
-SyncMiddlewareGeneratorFn = Callable[[TArg], SyncMiddlewareGenerator]
-AsyncMiddlewareGenerator = AsyncGenerator[TArg | TRes, TRes]
-AsyncMiddlewareGeneratorFn = Callable[[TArg], AsyncMiddlewareGenerator]
-AnyMiddlewareGeneratorFn = AsyncMiddlewareGeneratorFn | SyncMiddlewareGeneratorFn
+class SyncMiddlewareGeneratorFn[TArg, TRes](Protocol):
+    def __call__(self, arg: TArg, **kwargs: Any) -> SyncMiddlewareGenerator[TArg, TRes]:
+        ...
+
+type AsyncMiddlewareGenerator[TArg, TRes] = AsyncGenerator[TArg | TRes, TRes]
+
+class AsyncMiddlewareGeneratorFn[TArg, TRes](Protocol):
+    async def __call__(self, arg: TArg, **kwargs: Any) -> AsyncMiddlewareGenerator[TArg, TRes]:
+        ...
+
+type AnyMiddlewareGenerator[TArg, TRes] = SyncMiddlewareGenerator[TArg, TRes] | AsyncMiddlewareGenerator[TArg, TRes]
+type AnyMiddlewareGeneratorFn[TArg, TRes] = AsyncMiddlewareGeneratorFn[TArg, TRes] | \
+                                            SyncMiddlewareGeneratorFn[TArg, TRes]
+
+class WrappedSync[TArg, TRes](Protocol):
+    def __call__(self, arg: TArg, /, **kwargs: Any) -> TRes:
+        ...
+
+class WrappedAsync[TArg, TRes](Protocol):
+    async def __call__(self, arg: TArg, /, **kwargs) -> TRes:
+        ...
 
 
 class MiddlewareImplementation[TArg, TRes](NamedTuple):
-    generator_fns: Sequence[tuple[OperationStep, AnyMiddlewareGeneratorFn]]
+    generator_fns: Sequence[tuple[OperationStep, AnyMiddlewareGeneratorFn[TArg, TRes]]]
     arg_type: Type[TArg]
     res_type: Type[TRes]
     is_sync: bool
 
     @staticmethod
-    def _is_sync_step(fn: AnyMiddlewareGeneratorFn) -> bool:
+    def _is_sync_step(fn: AnyMiddlewareGeneratorFn[TArg, TRes]) -> bool:
         return isgeneratorfunction(fn)
 
     @classmethod
@@ -55,28 +70,28 @@ class MiddlewareImplementation[TArg, TRes](NamedTuple):
             cls,
             arg_type: Type[TArg],
             res_type: Type[TRes],
-            fns: Sequence[tuple[OperationStep, AnyMiddlewareGeneratorFn]],
+            fns: Sequence[tuple[OperationStep, AnyMiddlewareGeneratorFn[TArg, TRes]]],
     ) -> Self:
         is_sync = all(cls._is_sync_step(fn) for _step, fn in fns)
         return cls(generator_fns=fns, arg_type=arg_type, res_type=res_type, is_sync=is_sync)
 
     def run_sync(
             self,
-            wrapped: Callable[[TArg], TRes],
+            wrapped: WrappedSync[TArg, TRes],
             arg: TArg,
             **kwargs,
     ) -> TRes:
         if not self.is_sync:
             async_step_sample = next(step for step, fn in self.generator_fns if not self._is_sync_step(fn))
             raise RuntimeError(
-                f"Operation can not run synchronously as it has asynchronous steps, eg: {async_step_sample}"
+                f"Operation can not run synchronously as it has asynchronous (or unrecognized, potentially asynchronous) steps, eg: {async_step_sample}"
             )
 
         return MiddlewareRunner.run_sync(self, wrapped, arg, **kwargs)
 
     async def run_async(
             self,
-            wrapped: Callable[[TArg], Awaitable[TRes]],
+            wrapped: WrappedAsync[TArg, TRes],
             arg: TArg,
             **kwargs,
     ) -> TRes:
@@ -84,7 +99,7 @@ class MiddlewareImplementation[TArg, TRes](NamedTuple):
 
 
 class MiddlewareRunner[TArg, TRes]:
-    generators: list[tuple[OperationStep, AsyncMiddlewareGenerator | SyncMiddlewareGenerator]]
+    generators: list[tuple[OperationStep, AnyMiddlewareGenerator[TArg, TRes]]]
     result: Optional[TRes]
     error: Optional[Exception]
     arg: TArg
@@ -106,7 +121,7 @@ class MiddlewareRunner[TArg, TRes]:
         self.arg = arg
         self.kwargs = kwargs
 
-    def _step_forward_sync(self, step: OperationStep, generator: SyncMiddlewareGenerator) -> bool:
+    def _step_forward_sync(self, step: OperationStep, generator: SyncMiddlewareGenerator[TArg, TRes]) -> bool:
         try:
             res = next(generator)
         except StopIteration as e:
@@ -128,7 +143,7 @@ class MiddlewareRunner[TArg, TRes]:
                 self.error = UnexpectedMiddlewareValue(step=step, value=res)
                 return True
 
-    async def _ensure_async_generator_stop(self, step: OperationStep, generator: AsyncMiddlewareGenerator):
+    async def _ensure_async_generator_stop(self, step: OperationStep, generator: AsyncMiddlewareGenerator[TArg, TRes]):
         try:
             await anext(generator)
         except StopAsyncIteration:
@@ -138,7 +153,7 @@ class MiddlewareRunner[TArg, TRes]:
         else:
             self.error = UnexpectedMiddlewareContinue(step=step)
 
-    async def _step_forward_async(self, step: OperationStep, generator: AsyncMiddlewareGenerator) -> bool:
+    async def _step_forward_async(self, step: OperationStep, generator: AsyncMiddlewareGenerator[TArg, TRes]) -> bool:
         try:
             res = await anext(generator)
         except StopAsyncIteration:
@@ -160,11 +175,12 @@ class MiddlewareRunner[TArg, TRes]:
                 self.error = UnexpectedMiddlewareValue(step=step, value=res)
                 return True
 
-    def _step_backward_sync(self, step: OperationStep, generator: SyncMiddlewareGenerator):
+    def _step_backward_sync(self, step: OperationStep, generator: SyncMiddlewareGenerator[TArg, TRes]):
         try:
             if self.error is not None:
                 res = generator.throw(self.error)
             else:
+                assert isinstance(self.result, self.implementation.res_type)
                 res = generator.send(self.result)
         except StopIteration as e:
             if isinstance(e.value, self.implementation.res_type):
@@ -186,14 +202,16 @@ class MiddlewareRunner[TArg, TRes]:
 
     def _run_backward_sync(self) -> TRes:
         for step, generator in self.generators[::-1]:
+            assert isinstance(generator, Generator)
             self._step_backward_sync(step, generator)
         return self._return()
 
-    async def _step_backward_async(self, step: OperationStep, generator: AsyncMiddlewareGenerator):
+    async def _step_backward_async(self, step: OperationStep, generator: AsyncMiddlewareGenerator[TArg, TRes]):
         try:
             if self.error is not None:
                 res = await generator.athrow(self.error)
             else:
+                assert isinstance(self.result, self.implementation.res_type)
                 res = await generator.asend(self.result)
         except StopAsyncIteration:
             self.error = UnexpectedMiddlewareStop(step=step)
@@ -257,7 +275,7 @@ class MiddlewareRunner[TArg, TRes]:
     def run_sync(
             cls,
             impl: MiddlewareImplementation[TArg, TRes],
-            wrapped: Callable[[TArg], TRes],
+            wrapped: WrappedSync[TArg, TRes],
             /,
             arg: TArg,
             **kwargs,
@@ -278,7 +296,7 @@ class MiddlewareRunner[TArg, TRes]:
     async def run_async(
             cls,
             impl: MiddlewareImplementation[TArg, TRes],
-            wrapped: Callable[[TArg], Awaitable[TRes]],
+            wrapped: WrappedAsync[TArg, TRes],
             /,
             arg: TArg,
             **kwargs,
@@ -304,14 +322,14 @@ class MiddlewareOperation[TArg, TRes](MagicOperation[AnyMiddlewareGeneratorFn[TA
 
     >>> op = MiddlewareOperation('create_item_mw', dict, Item)
     >>>
-    >>> def create_item(params: dict) -> Item:
+    >>> def create_item(params: dict, **kwargs: Any) -> Item:
     >>>     ...
     >>>
     >>> op.invoke(create_item, {'color': 'red'})
 
     Можно использовать как с синхронными, так и с асинхронными функциями:
 
-    >>> async def create_item_async(params: dict) -> Item:
+    >>> async def create_item_async(params: dict, **kwargs: Any) -> Item:
     >>>     ...
     >>>
     >>> async def foo():
@@ -373,7 +391,7 @@ class MiddlewareOperation[TArg, TRes](MagicOperation[AnyMiddlewareGeneratorFn[TA
 
     def invoke(
             self,
-            wrapped: Callable[[TArg], TRes],
+            wrapped: WrappedSync[TArg, TRes],
             /,
             arg: TArg,
             **kwargs,
@@ -382,7 +400,7 @@ class MiddlewareOperation[TArg, TRes](MagicOperation[AnyMiddlewareGeneratorFn[TA
 
     async def ainvoke(
             self,
-            wrapped: Callable[[TArg], Awaitable[TRes]],
+            wrapped: WrappedAsync[TArg, TRes],
             /,
             arg: TArg,
             **kwargs,

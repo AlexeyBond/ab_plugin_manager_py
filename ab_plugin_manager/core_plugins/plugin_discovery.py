@@ -55,7 +55,11 @@ class PluginDiscoveryPlugin(MagicPlugin):
       указанных в pluginPaths.
     """
 
-    def __init__(self) -> None:
+    def __init__(
+            self,
+            config: Optional[_Config] = None,
+    ) -> None:
+        self.config = type(self).config.copy() if config is None else config
         super().__init__()
         self._plugins: list[Plugin] = []
         self._excluded: set[str] = set()
@@ -70,7 +74,7 @@ class PluginDiscoveryPlugin(MagicPlugin):
         yield from super().get_operation_steps(op_name)
 
     def list_implemented_operations(self) -> Iterable[str]:
-        ops = set()
+        ops: set[str] = set()
 
         for plugin in self._plugins:
             # Может выбросить UnlistableOperationSetException.
@@ -203,8 +207,8 @@ class PluginDiscoveryPlugin(MagicPlugin):
         return MagicModulePlugin(module),
 
     def register_fastapi_endpoints(self, router, *_args, **_kwargs) -> None:
-        from fastapi import APIRouter # type : ignore
-        from pydantic import BaseModel, Field # type : ignore
+        from fastapi import APIRouter  # type: ignore[import-not-found]
+        from pydantic import BaseModel, Field  # type: ignore[import-not-found]
 
         r: APIRouter = router
 

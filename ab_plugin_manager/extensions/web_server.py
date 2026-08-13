@@ -1,13 +1,14 @@
 import asyncio
+from enum import Enum
 from logging import getLogger
-from typing import Optional, Callable, Iterable
+from typing import Optional, Callable, Iterable, Collection, Literal
 
 import uvicorn  # type: ignore
 from fastapi import FastAPI, APIRouter  # type: ignore
 
 from ab_plugin_manager.abc import OperationStep
 from ab_plugin_manager.magic_operation import CallAllOperation, MagicOperation
-from ab_plugin_manager.magic_plugin import MagicPlugin, step_name
+from ab_plugin_manager.magic_plugin import MagicPlugin, step_name, operation
 
 __all__ = [
     "WebServerPlugin",
@@ -18,7 +19,7 @@ __all__ = [
 
 register_fastapi_routes_op = CallAllOperation[FastAPI]("register_fastapi_routes")
 register_fastapi_endpoints_op = MagicOperation[Callable[[APIRouter], None]]("register_fastapi_endpoints")
-fastapi_tags_op = MagicOperation("fastapi_tags")
+fastapi_tags_op = MagicOperation[Collection[str] | str]("fastapi_tags")
 
 
 class WebServerPlugin(MagicPlugin):
@@ -41,7 +42,14 @@ class WebServerPlugin(MagicPlugin):
 
     _logger = getLogger(name)
 
-    def __init__(self, app_name: str = "Web-приложение") -> None:
+    def __init__(
+            self,
+            app_name: str = "Web-приложение",
+            run_mode: Literal['run', 'job', 'default_job'] = 'run',
+    ) -> None:
+        if run_mode != 'run':
+            setattr(self, 'run', operation(run_mode)(type(self).run).__get__(self))
+
         super().__init__()
 
         self._app_name = app_name
@@ -68,8 +76,8 @@ class WebServerPlugin(MagicPlugin):
 
         return ()
 
-    def _get_fastapi_tags_for_routes_op(self, routes_step: OperationStep) -> list[str]:
-        result = []
+    def _get_fastapi_tags_for_routes_op(self, routes_step: OperationStep) -> list[str | Enum]:
+        result: list[str | Enum] = []
 
         for tags_step in routes_step.plugin.get_operation_steps(fastapi_tags_op.operation):
             if tags_step.plugin is routes_step.plugin:
@@ -101,6 +109,7 @@ class WebServerPlugin(MagicPlugin):
         await self._server.serve()
         self._logger.debug("Сервер завершил работу.")
 
+    @step_name('web-server')
     async def run(self, *_args, **_kwargs):
         if 'reload' in self.config or 'workers' in self.config:
             self._logger.warning(

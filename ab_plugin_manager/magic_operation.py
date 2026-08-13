@@ -2,19 +2,31 @@ import asyncio
 from abc import ABC
 from asyncio import Task, to_thread
 from functools import wraps, partial
-from typing import Callable, Iterable, Union, Awaitable, Collection, Optional, NamedTuple, Self, Type
+from typing import Callable, Iterable, Union, Awaitable, Collection, Optional, NamedTuple, Self, Type, overload, Any, \
+    Protocol, TypeGuard, Unpack
 
-from ab_plugin_manager.abc import PluginManager, OperationStep
+from ab_plugin_manager.abc import PluginManager, OperationStep, Plugin
 from ab_plugin_manager.magic_plugin import operation as operation_decorator, not_operation as not_operation_decorator
 from ab_plugin_manager.run_operation import call_all_as_wrappers, call_all, call_all_parallel_async, \
     call_all_as_wrappers_async
 
 
-def _is_method(fn) -> bool:
+def _is_method(fn) -> TypeGuard['CallableMethod']:
     import inspect
     # TODO: Find a more accurate way to detect a method...
     args = inspect.getargs(fn.__code__).args
     return len(args) > 0 and args[0] == "self"
+
+
+class Method[C, T](Protocol):
+    # This definition looks correct, but seems to confuse MyPy, making it produce false negatives...
+    def __get__(self, target: C) -> T:
+        ...
+
+
+class CallableMethod[C: Plugin, *TArgs, TRes](Method[C, Callable[[*TArgs], TRes]], Protocol):
+    def __call__(self, o: C, /, *args: Unpack[TArgs]) -> TRes:
+        ...
 
 
 class MagicOperation[TImpl]:
@@ -93,8 +105,19 @@ class MagicOperation[TImpl]:
             lambda: list(self.get_steps_no_cache()),
         )
 
-    def implementation(self, fn: TImpl):
-        return operation_decorator(self.operation)(fn)
+    def _mark_implementation[T: Any](self, impl: T) -> T:
+        return operation_decorator(self.operation)(impl)
+
+    @overload
+    def implementation(self, fn: TImpl) -> TImpl:
+        ...
+
+    @overload
+    def implementation[C](self, fn: Method[C, TImpl]) -> Method[C, TImpl]:
+        ...
+
+    def implementation(self, fn: TImpl | Method[Any, TImpl]):
+        return self._mark_implementation(fn)
 
 
 _OPERATION_STEPS_CACHE_KEY = id(MagicOperation)
@@ -202,7 +225,7 @@ class WrapperCallOperation[*TARgs, TResult](
 
     Выполнить операцию можно при помощи оператора вызова функции или через методы `invoke`/`ainvoke`:
 
-    >>> async def mine(*args, **kwargs):
+    >>> async def main(*args, **kwargs):
     >>>     op(*args, **kwargs)
     >>>     op.invoke(*args, **kwargs)
     >>>     # `ainvoke` выполнит операцию в executor'е
@@ -223,7 +246,16 @@ class WrapperCallOperation[*TARgs, TResult](
 
     __call__ = invoke
 
-    def factory_implementation(self, fn: Callable[[*TARgs], TResult]):
+    @overload
+    def factory_implementation[C: Plugin](self, fn: CallableMethod[C, *TARgs, TResult]) -> CallableMethod[
+        C, *TARgs, TResult]:
+        ...
+
+    @overload
+    def factory_implementation(self, fn: Callable[[*TARgs], TResult]) -> Callable[[*TARgs], TResult]:
+        ...
+
+    def factory_implementation(self, fn: Callable | CallableMethod):
         if _is_method(fn):
             @wraps(fn)
             def impl(self, nxt, prev, *args, **kwargs):
@@ -233,7 +265,7 @@ class WrapperCallOperation[*TARgs, TResult](
             def impl(nxt, prev, *args, **kwargs):
                 return nxt(prev if prev is not None else fn(*args, **kwargs), *args, **kwargs)
 
-        return self.implementation(impl)
+        return self._mark_implementation(impl)
 
 
 class AsyncWrapperCallOperation[*TARgs, TResult](
@@ -286,7 +318,18 @@ class AsyncWrapperCallOperation[*TARgs, TResult](
 
     __call__ = ainvoke
 
+    @overload
+    def factory_implementation[C: object](
+            self,
+            fn: Callable[[C, *TARgs], Awaitable[TResult]],
+    ) -> Callable[[C], Awaitable[TResult]]:
+        ...
+
+    @overload
     def factory_implementation(self, fn: Callable[[*TARgs], Awaitable[TResult]]):
+        ...
+
+    def factory_implementation(self, fn: Any):
         if _is_method(fn):
             @wraps(fn)
             async def impl(self, nxt, prev, *args: *TARgs, **kwargs):
@@ -299,7 +342,7 @@ class AsyncWrapperCallOperation[*TARgs, TResult](
             async def impl(nxt, prev, *args: *TARgs, **kwargs):
                 return await nxt(prev if prev is not None else await fn(*args, **kwargs), *args, **kwargs)
 
-        return self.implementation(impl)
+        return self._mark_implementation(impl)
 
 
 class CallAllAsyncConcurrentOperation[*TArgs, TResult](

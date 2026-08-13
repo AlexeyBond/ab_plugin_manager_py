@@ -1,9 +1,10 @@
 import asyncio
 import signal
 from argparse import ArgumentParser
+from asyncio import CancelledError
 from concurrent.futures import ThreadPoolExecutor
 from logging import getLogger
-from typing import Collection, Optional, Awaitable
+from typing import Collection, Optional, Awaitable, Any
 
 from ab_plugin_manager.abc import Plugin
 from ab_plugin_manager.operations import bootstrap, setup_cli_arguments, receive_cli_arguments
@@ -104,7 +105,11 @@ async def _run_with_interrupts(future: Awaitable):
         else:
             await completed
     finally:
-        interrupt_task.cancel()
+        if interrupt_task.cancel():
+            try:
+                await interrupt_task
+            except CancelledError:
+                pass
 
 
 def launch_application(
@@ -173,6 +178,7 @@ def launch_application(
         asyncio.get_running_loop().set_default_executor(executor)
 
         run_tasks: Optional[Collection[asyncio.Task]] = None
+        run_gather_future: Optional[Awaitable[Any]] = None
 
         try:
             init_tasks = await call_all_parallel_async(pm.get_operation_sequence('init'))
@@ -186,8 +192,9 @@ def launch_application(
             _logger.info("Инициализация завершена.")
 
             run_tasks = await call_all_parallel_async(pm.get_operation_sequence('run'))
+            run_gather_future = asyncio.gather(*run_tasks)
             try:
-                await _run_with_interrupts(asyncio.gather(*run_tasks))
+                await _run_with_interrupts(run_gather_future)
             except InterruptedError:
                 _logger.info("Получен сигнал прерывания.")
                 return
@@ -214,7 +221,10 @@ def launch_application(
 
                 # TODO: Нужно проверить, корректно ли отрабатывает следующий блок...
                 try:
-                    await _run_with_interrupts(asyncio.gather(*run_tasks, return_exceptions=True))
+                    awaitables: list[Awaitable] = [*run_tasks]
+                    if run_gather_future is not None:
+                        awaitables.append(run_gather_future)
+                    await _run_with_interrupts(asyncio.gather(*awaitables, return_exceptions=True))
                 except InterruptedError:
                     _logger.info("Получен ещё один сигнал прерывания. Пытаюсь завершиться быстрее.")
                 else:
